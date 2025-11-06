@@ -1,8 +1,8 @@
-# teleport
-
-<img src="public/logo.png" alt="teleport logo" width="128" height="128" />
-
-A mobile app for Android that allows you to mock GPS locations and simulate realistic driver movement between coordinates.
+<div align="center">
+  <img src="public/logo.png" alt="teleport logo" width="128" height="128" />
+  <h1>teleport</h1>
+  <p>A mobile app for Android that allows you to mock GPS locations and simulate realistic driver movement between coordinates.</p>
+</div>
 
 ## Features
 
