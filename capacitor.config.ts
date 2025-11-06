@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.teleport',
+  appId: 'io.github.vinctustech.teleport',
   appName: 'teleport',
   webDir: 'dist',
   plugins: {

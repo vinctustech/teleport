@@ -1,4 +1,4 @@
-package com.teleport;
+package io.github.vinctustech.teleport;
 
 import android.Manifest;
 import android.content.Context;
@@ -14,6 +14,7 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 @CapacitorPlugin(
     name = "LocationMocker",
@@ -44,8 +45,8 @@ public class LocationMockerPlugin extends Plugin {
         enableMockLocationCallback(call);
     }
 
-    @PluginMethod
-    public void enableMockLocationCallback(PluginCall call) {
+    @PermissionCallback
+    private void enableMockLocationCallback(PluginCall call) {
         try {
             // Remove test provider if it already exists
             try {
@@ -164,8 +165,8 @@ public class LocationMockerPlugin extends Plugin {
         getCurrentLocationCallback(call);
     }
 
-    @PluginMethod
-    public void getCurrentLocationCallback(PluginCall call) {
+    @PermissionCallback
+    private void getCurrentLocationCallback(PluginCall call) {
         try {
             Location location = locationManager.getLastKnownLocation(MOCK_PROVIDER);
 

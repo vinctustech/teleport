@@ -1,4 +1,4 @@
-package com.teleport;
+package io.github.vinctustech.teleport;
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
