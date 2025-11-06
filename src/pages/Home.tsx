@@ -1,5 +1,5 @@
 import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonText, IonButtons, IonIcon, IonProgressBar } from '@ionic/react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { flask, car } from 'ionicons/icons';
 import LocationMocker from '../plugins/LocationMocker';
 import DriverSimulation from '../components/DriverSimulation';
@@ -11,6 +11,16 @@ const Home: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeScreen, setActiveScreen] = useState<'test' | 'simulation'>('test');
   const [progress, setProgress] = useState<number>(0);
+  const simulationInterval = useRef<NodeJS.Timeout | null>(null);
+  const simulationState = useRef<{
+    startLat: number;
+    startLon: number;
+    endLat: number;
+    endLon: number;
+    speed: number;
+    totalDistance: number;
+    currentDistance: number;
+  } | null>(null);
 
   // Hardcoded test location: Times Square, NYC
   const TEST_LAT = 40.758;
@@ -88,14 +98,68 @@ const Home: React.FC = () => {
     }
   };
 
+  const startSimulationInterval = () => {
+    if (!simulationState.current) return;
+
+    const { startLat, startLon, endLat, endLon, speed, totalDistance } = simulationState.current;
+
+    // Update interval in milliseconds (update every second)
+    const updateInterval = 1000;
+    // Distance traveled per update (speed is km/h, convert to km/s)
+    const distancePerUpdate = (speed / 3600) * (updateInterval / 1000);
+
+    // Clear any existing interval
+    if (simulationInterval.current) {
+      clearInterval(simulationInterval.current);
+    }
+
+    simulationInterval.current = setInterval(async () => {
+      if (!simulationState.current) return;
+
+      simulationState.current.currentDistance += distancePerUpdate;
+      const progressValue = Math.min(simulationState.current.currentDistance / totalDistance, 1);
+      setProgress(progressValue);
+
+      if (simulationState.current.currentDistance >= totalDistance) {
+        // Reached destination
+        await LocationMocker.setMockLocation({
+          latitude: endLat,
+          longitude: endLon,
+          accuracy: 1.0,
+        });
+        setCurrentLocation({ latitude: endLat, longitude: endLon, accuracy: 1.0 });
+        setStatus('Arrived at destination');
+        setProgress(1);
+        if (simulationInterval.current) {
+          clearInterval(simulationInterval.current);
+          simulationInterval.current = null;
+        }
+        simulationState.current = null;
+      } else {
+        // Interpolate current position
+        const fraction = simulationState.current.currentDistance / totalDistance;
+        const currentLat = startLat + (endLat - startLat) * fraction;
+        const currentLon = startLon + (endLon - startLon) * fraction;
+
+        await LocationMocker.setMockLocation({
+          latitude: currentLat,
+          longitude: currentLon,
+          accuracy: 1.0,
+        });
+        setCurrentLocation({ latitude: currentLat, longitude: currentLon, accuracy: 1.0 });
+      }
+    }, updateInterval);
+  };
+
   const handleSimulationStart = async (startLat: number, startLon: number, endLat: number, endLon: number, speed: number) => {
     try {
       setStatus('Starting driver simulation...');
       setError(null);
-      setProgress(0.2);
+      setProgress(0);
+
       // Enable mock location first
       await LocationMocker.enableMockLocation();
-      setProgress(0.4);
+
       // Set starting position
       await LocationMocker.setMockLocation({
         latitude: startLat,
@@ -103,13 +167,43 @@ const Home: React.FC = () => {
         accuracy: 1.0,
       });
       setCurrentLocation({ latitude: startLat, longitude: startLon, accuracy: 1.0 });
-      setProgress(0.6);
-      setStatus(`Simulation started from (${startLat}, ${startLon}) to (${endLat}, ${endLon}) at ${speed} km/h`);
-      // TODO: Implement movement logic
+
+      // Calculate distance using Haversine formula (in km)
+      const toRad = (deg: number) => deg * Math.PI / 180;
+      const R = 6371; // Earth's radius in km
+      const dLat = toRad(endLat - startLat);
+      const dLon = toRad(endLon - startLon);
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(toRad(startLat)) * Math.cos(toRad(endLat)) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      const totalDistance = R * c; // in km
+
+      // Store simulation state
+      simulationState.current = {
+        startLat,
+        startLon,
+        endLat,
+        endLon,
+        speed,
+        totalDistance,
+        currentDistance: 0
+      };
+
+      setStatus(`Driving ${totalDistance.toFixed(2)} km at ${speed} km/h`);
+
+      // Start the simulation interval
+      startSimulationInterval();
+
     } catch (err: any) {
       setError(err.message || 'Failed to start simulation');
       setStatus('Error');
       setProgress(0);
+      if (simulationInterval.current) {
+        clearInterval(simulationInterval.current);
+        simulationInterval.current = null;
+      }
+      simulationState.current = null;
     }
   };
 
@@ -117,7 +211,16 @@ const Home: React.FC = () => {
     try {
       setStatus('Stopping simulation...');
       setError(null);
-      setProgress(0.5);
+
+      // Clear the simulation interval
+      if (simulationInterval.current) {
+        clearInterval(simulationInterval.current);
+        simulationInterval.current = null;
+      }
+
+      // Clear simulation state
+      simulationState.current = null;
+
       await LocationMocker.disableMockLocation();
       setStatus('Simulation stopped');
       setProgress(0);
@@ -127,6 +230,21 @@ const Home: React.FC = () => {
       setStatus('Error');
       setProgress(0);
     }
+  };
+
+  const handleSimulationPause = () => {
+    if (simulationInterval.current) {
+      clearInterval(simulationInterval.current);
+      simulationInterval.current = null;
+    }
+    setStatus('Simulation paused');
+  };
+
+  const handleSimulationResume = () => {
+    if (!simulationState.current) return;
+
+    setStatus(`Driving ${simulationState.current.totalDistance.toFixed(2)} km at ${simulationState.current.speed} km/h`);
+    startSimulationInterval();
   };
 
   return (
@@ -240,7 +358,12 @@ const Home: React.FC = () => {
 
         {activeScreen === 'simulation' && (
           <>
-            <DriverSimulation onStart={handleSimulationStart} onStop={handleSimulationStop} />
+            <DriverSimulation
+              onStart={handleSimulationStart}
+              onStop={handleSimulationStop}
+              onPause={handleSimulationPause}
+              onResume={handleSimulationResume}
+            />
 
             <IonCard>
               <IonCardHeader>
