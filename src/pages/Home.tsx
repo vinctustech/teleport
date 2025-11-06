@@ -76,7 +76,12 @@ const Home: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle className="teleport-title">teleport</IonTitle>
+          <IonTitle className="teleport-title">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src="/logo.png" alt="teleport logo" style={{ width: '32px', height: '32px' }} />
+              teleport
+            </div>
+          </IonTitle>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="ion-padding">
