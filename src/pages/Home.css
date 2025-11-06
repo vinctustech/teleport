@@ -1,0 +1,15 @@
+.teleport-title {
+  font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  font-size: 1.6em;
+}
+
+.teleport-title-large {
+  font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: lowercase;
+  font-size: 1.1em;
+}
