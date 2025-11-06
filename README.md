@@ -1,5 +1,7 @@
 # teleport
 
+<img src="public/logo.png" alt="teleport logo" width="128" height="128" />
+
 A mobile app for Android that allows you to mock GPS locations and simulate realistic driver movement between coordinates.
 
 ## Features
@@ -144,11 +146,3 @@ The app requires the following Android permissions:
 ## License
 
 MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.
-
-## Acknowledgments
-
-Built with Ionic React and Capacitor for a seamless native Android experience.
