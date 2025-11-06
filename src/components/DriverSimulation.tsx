@@ -55,24 +55,30 @@ const DriverSimulation: React.FC<DriverSimulationProps> = ({ onStart, onStop, on
           <IonCardTitle>Start Location</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
-          <IonItem>
-            <IonLabel position="stacked">Latitude</IonLabel>
-            <IonInput
-              type="number"
-              value={startLat}
-              onIonInput={(e) => setStartLat(e.detail.value!)}
-              disabled={simState !== 'idle'}
-            />
-          </IonItem>
-          <IonItem>
-            <IonLabel position="stacked">Longitude</IonLabel>
-            <IonInput
-              type="number"
-              value={startLon}
-              onIonInput={(e) => setStartLon(e.detail.value!)}
-              disabled={simState !== 'idle'}
-            />
-          </IonItem>
+          <IonRow>
+            <IonCol size="6">
+              <IonItem>
+                <IonLabel position="stacked">Latitude</IonLabel>
+                <IonInput
+                  type="number"
+                  value={startLat}
+                  onIonInput={(e) => setStartLat(e.detail.value!)}
+                  disabled={simState !== 'idle'}
+                />
+              </IonItem>
+            </IonCol>
+            <IonCol size="6">
+              <IonItem>
+                <IonLabel position="stacked">Longitude</IonLabel>
+                <IonInput
+                  type="number"
+                  value={startLon}
+                  onIonInput={(e) => setStartLon(e.detail.value!)}
+                  disabled={simState !== 'idle'}
+                />
+              </IonItem>
+            </IonCol>
+          </IonRow>
         </IonCardContent>
       </IonCard>
 
@@ -81,24 +87,30 @@ const DriverSimulation: React.FC<DriverSimulationProps> = ({ onStart, onStop, on
           <IonCardTitle>End Location</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
-          <IonItem>
-            <IonLabel position="stacked">Latitude</IonLabel>
-            <IonInput
-              type="number"
-              value={endLat}
-              onIonInput={(e) => setEndLat(e.detail.value!)}
-              disabled={simState !== 'idle'}
-            />
-          </IonItem>
-          <IonItem>
-            <IonLabel position="stacked">Longitude</IonLabel>
-            <IonInput
-              type="number"
-              value={endLon}
-              onIonInput={(e) => setEndLon(e.detail.value!)}
-              disabled={simState !== 'idle'}
-            />
-          </IonItem>
+          <IonRow>
+            <IonCol size="6">
+              <IonItem>
+                <IonLabel position="stacked">Latitude</IonLabel>
+                <IonInput
+                  type="number"
+                  value={endLat}
+                  onIonInput={(e) => setEndLat(e.detail.value!)}
+                  disabled={simState !== 'idle'}
+                />
+              </IonItem>
+            </IonCol>
+            <IonCol size="6">
+              <IonItem>
+                <IonLabel position="stacked">Longitude</IonLabel>
+                <IonInput
+                  type="number"
+                  value={endLon}
+                  onIonInput={(e) => setEndLon(e.detail.value!)}
+                  disabled={simState !== 'idle'}
+                />
+              </IonItem>
+            </IonCol>
+          </IonRow>
         </IonCardContent>
       </IonCard>
 
