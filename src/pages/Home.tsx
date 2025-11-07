@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import { flask, car } from 'ionicons/icons';
 import LocationMocker from '../plugins/LocationMocker';
 import DriverSimulation from '../components/DriverSimulation';
+import { version } from '../../package.json';
 import './Home.css';
 
 const Home: React.FC = () => {
@@ -295,10 +296,13 @@ const Home: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle className="teleport-title">
+          <IonTitle>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src="/logo.png" alt="teleport logo" style={{ width: '32px', height: '32px' }} />
-              teleport
+              <span className="teleport-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <img src="/logo.png" alt="teleport logo" style={{ width: '32px', height: '32px' }} />
+                teleport
+              </span>
+              <span style={{ fontSize: '0.9em', fontWeight: '400', opacity: '0.7', alignSelf: 'flex-end', marginBottom: '2px' }}>v{version}</span>
             </div>
           </IonTitle>
           <IonButtons slot="end">
