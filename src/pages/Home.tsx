@@ -315,7 +315,7 @@ const Home: React.FC = () => {
           </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen style={{ '--padding-start': '8px', '--padding-end': '8px', '--padding-top': '8px', '--padding-bottom': '8px' }}>
+      <IonContent fullscreen style={{ '--padding-start': '8px', '--padding-end': '8px', '--padding-top': '6px', '--padding-bottom': '8px' }}>
         <IonHeader collapse="condense">
           <IonToolbar>
             <IonTitle size="large" className="teleport-title-large">teleport</IonTitle>
