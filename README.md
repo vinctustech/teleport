@@ -2,8 +2,8 @@
   <img src="public/logo.png" alt="teleport logo" width="128" height="128" />
   <h1>
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://readme-typing-svg.demolab.com?font=Orbitron&weight=400&size=48&duration=1&pause=999999&color=FFFFFF&center=true&vCenter=true&width=310&lines=t%E2%80%8Ae%E2%80%8Al%E2%80%8Ae%E2%80%8Ap%E2%80%8Ao%E2%80%8Ar%E2%80%8At">
-      <img alt="teleport" src="https://readme-typing-svg.demolab.com?font=Orbitron&weight=400&size=48&duration=1&pause=999999&color=000000&center=true&vCenter=true&width=310&lines=t%E2%80%8Ae%E2%80%8Al%E2%80%8Ae%E2%80%8Ap%E2%80%8Ao%E2%80%8Ar%E2%80%8At">
+      <source media="(prefers-color-scheme: dark)" srcset="https://readme-typing-svg.demolab.com?font=Orbitron&weight=400&size=48&duration=1&pause=999999&color=FFFFFF&center=true&vCenter=true&width=315&lines=t%E2%80%8A%E2%80%8Ae%E2%80%8A%E2%80%8Al%E2%80%8A%E2%80%8Ae%E2%80%8A%E2%80%8Ap%E2%80%8A%E2%80%8Ao%E2%80%8A%E2%80%8Ar%E2%80%8A%E2%80%8At">
+      <img alt="teleport" src="https://readme-typing-svg.demolab.com?font=Orbitron&weight=400&size=48&duration=1&pause=999999&color=000000&center=true&vCenter=true&width=315&lines=t%E2%80%8A%E2%80%8Ae%E2%80%8A%E2%80%8Al%E2%80%8A%E2%80%8Ae%E2%80%8A%E2%80%8Ap%E2%80%8A%E2%80%8Ao%E2%80%8A%E2%80%8Ar%E2%80%8A%E2%80%8At">
     </picture>
   </h1>
   <p>A mobile app for Android that allows you to mock GPS locations and simulate realistic driver movement between coordinates.</p>
