@@ -122,24 +122,59 @@ const Home: React.FC = () => {
       setProgress(progressValue);
 
       if (simulationState.current.currentDistance >= totalDistance) {
-        // Reached destination
+        // Calculate bearing from start to end
+        const toRad = (deg: number) => deg * Math.PI / 180;
+        const toDeg = (rad: number) => rad * 180 / Math.PI;
+
+        const φ1 = toRad(startLat);
+        const φ2 = toRad(endLat);
+        const λ1 = toRad(startLon);
+        const λ2 = toRad(endLon);
+
+        // Calculate bearing
+        const y = Math.sin(λ2 - λ1) * Math.cos(φ2);
+        const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
+        const bearing = Math.atan2(y, x);
+
+        // Calculate point 20m (0.02 km) beyond endpoint
+        const R = 6371; // Earth's radius in km
+        const d = 0.02; // 20 meters in km
+
+        const φ3 = Math.asin(Math.sin(φ2) * Math.cos(d / R) + Math.cos(φ2) * Math.sin(d / R) * Math.cos(bearing));
+        const λ3 = λ2 + Math.atan2(Math.sin(bearing) * Math.sin(d / R) * Math.cos(φ2), Math.cos(d / R) - Math.sin(φ2) * Math.sin(φ3));
+
+        const finalLat = toDeg(φ3);
+        const finalLon = toDeg(λ3);
+
+        // Reached destination - set final location 10m beyond endpoint
         await LocationMocker.setMockLocation({
-          latitude: endLat,
-          longitude: endLon,
+          latitude: finalLat,
+          longitude: finalLon,
           accuracy: 1.0,
         });
-        setCurrentLocation({ latitude: endLat, longitude: endLon, accuracy: 1.0 });
+        setCurrentLocation({ latitude: finalLat, longitude: finalLon, accuracy: 1.0 });
         setStatus('Arrived at destination');
         setProgress(1);
+
+        // Clear interval first
         if (simulationInterval.current) {
           clearInterval(simulationInterval.current);
           simulationInterval.current = null;
         }
         simulationState.current = null;
-        // Notify DriverSimulation component to return to idle state
-        if (onSimulationCompleteRef.current) {
-          onSimulationCompleteRef.current();
-        }
+
+        // Wait a bit to ensure location propagates, then set it again to be certain
+        setTimeout(async () => {
+          await LocationMocker.setMockLocation({
+            latitude: finalLat,
+            longitude: finalLon,
+            accuracy: 1.0,
+          });
+          // Notify DriverSimulation component to return to idle state
+          if (onSimulationCompleteRef.current) {
+            onSimulationCompleteRef.current();
+          }
+        }, 200);
       } else {
         // Interpolate current position
         const fraction = simulationState.current.currentDistance / totalDistance;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, IonRow, IonCol, IonSelect, IonSelectOption } from '@ionic/react';
+import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, IonRow, IonCol, IonSelect, IonSelectOption, IonIcon } from '@ionic/react';
+import { swapVertical } from 'ionicons/icons';
 import { Preferences } from '@capacitor/preferences';
 import '../pages/Home.css';
 
@@ -147,6 +148,16 @@ const DriverSimulation: React.FC<DriverSimulationProps> = ({ onStart, onStop, on
     onResume();
   };
 
+  const handleFlipStartEnd = () => {
+    // Swap start and end coordinates
+    const tempLat = startLat;
+    const tempLon = startLon;
+    setStartLat(endLat);
+    setStartLon(endLon);
+    setEndLat(tempLat);
+    setEndLon(tempLon);
+  };
+
   return (
     <>
       <IonCard>
@@ -258,15 +269,30 @@ const DriverSimulation: React.FC<DriverSimulationProps> = ({ onStart, onStop, on
           <IonCardTitle>Speed</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
-          <IonItem>
-            <IonLabel position="stacked">Speed (km/h)</IonLabel>
-            <IonInput
-              type="number"
-              value={speed}
-              onIonInput={(e) => setSpeed(e.detail.value!)}
-              disabled={simState !== 'idle'}
-            />
-          </IonItem>
+          <IonRow style={{ alignItems: 'flex-end' }}>
+            <IonCol size="9">
+              <IonItem>
+                <IonLabel position="stacked">Speed (km/h)</IonLabel>
+                <IonInput
+                  type="number"
+                  value={speed}
+                  onIonInput={(e) => setSpeed(e.detail.value!)}
+                  disabled={simState !== 'idle'}
+                />
+              </IonItem>
+            </IonCol>
+            <IonCol size="3">
+              <IonButton
+                expand="block"
+                fill="outline"
+                onClick={handleFlipStartEnd}
+                disabled={simState !== 'idle'}
+                style={{ margin: 0 }}
+              >
+                <IonIcon icon={swapVertical} />
+              </IonButton>
+            </IonCol>
+          </IonRow>
         </IonCardContent>
       </IonCard>
 
