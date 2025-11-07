@@ -147,7 +147,9 @@ teleport/
 
 ## How It Works
 
-The app uses Android's `LocationManager` test provider API to mock GPS locations. When enabled, it creates a test GPS provider that overrides the device's actual location. The driver simulation calculates the distance between two points using the Haversine formula and updates the mock location at regular intervals to simulate realistic movement.
+The app uses a custom Capacitor plugin (`LocationMockerPlugin`) that interfaces with Android's `LocationManager` test provider API to mock GPS locations. When enabled, it creates a test GPS provider that overrides the device's actual location. The driver simulation calculates the distance between two points using the Haversine formula and updates the mock location at regular intervals to simulate realistic movement.
+
+The `LocationMockerPlugin` provides TypeScript bindings for the native Android LocationManager functionality, allowing the React UI to control mock locations through a simple JavaScript interface. This plugin handles enabling/disabling the test provider, setting mock locations with latitude/longitude/accuracy, and querying the device's current location.
 
 Simulations are persisted using Capacitor Preferences API (Android SharedPreferences), allowing you to save, load, and quickly switch between different route configurations. When a simulation reaches its destination, the final location is set to a point 20 meters beyond the endpoint along the same bearing—this ensures that apps polling for location updates at intervals will reliably capture the destination coordinates.
 
