@@ -27,6 +27,13 @@
 
 The app provides two main screens:
 
+<div align="center">
+  <img src="public/screenshots/test-screen.png" alt="Test Screen" width="300" />
+  <img src="public/screenshots/simulation-screen.png" alt="Simulation Screen" width="300" />
+  <br/>
+  <em>Test Screen (left) and Simulation Screen (right)</em>
+</div>
+
 1. **Test Screen** - Quick location mocking with preset coordinates
 2. **Simulation Screen** - Full driver simulation with customizable parameters
 
