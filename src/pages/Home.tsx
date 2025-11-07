@@ -105,8 +105,8 @@ const Home: React.FC = () => {
 
     const { startLat, startLon, endLat, endLon, speed, totalDistance } = simulationState.current;
 
-    // Update interval in milliseconds (update every second)
-    const updateInterval = 1000;
+    // Update interval in milliseconds (update every 250ms)
+    const updateInterval = 250;
     // Distance traveled per update (speed is km/h, convert to km/s)
     const distancePerUpdate = (speed / 3600) * (updateInterval / 1000);
 

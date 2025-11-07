@@ -89,6 +89,15 @@ const DriverSimulation: React.FC<DriverSimulationProps> = ({ onStart, onStop, on
       return;
     }
 
+    // Check if simulation with this name already exists
+    const existingSim = savedSimulations.find(s => s.name === simName);
+    if (existingSim) {
+      const confirmed = window.confirm(`A simulation named "${simName}" already exists. Do you want to overwrite it?`);
+      if (!confirmed) {
+        return;
+      }
+    }
+
     const newSim: SavedSimulation = {
       name: simName,
       startLat,
