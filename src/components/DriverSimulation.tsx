@@ -110,6 +110,7 @@ const DriverSimulation: React.FC<DriverSimulationProps> = ({ onStart, onStop, on
     const updatedSims = [...savedSimulations.filter(s => s.name !== simName), newSim];
     setSavedSimulations(updatedSims);
     await Preferences.set({ key: 'savedSimulations', value: JSON.stringify(updatedSims) });
+    setSelectedSim(simName);
     alert(`Simulation "${simName}" saved!`);
   };
 
