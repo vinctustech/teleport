@@ -421,7 +421,14 @@ const Home: React.FC = () => {
               <IonCardContent>
                 <IonProgressBar value={progress} color={error ? 'danger' : 'primary'}></IonProgressBar>
                 <IonText color={error ? 'danger' : 'primary'}>
-                  <p style={{ margin: '8px 0 4px 0' }}><strong>Status:</strong> {status}</p>
+                  <p style={{ margin: '8px 0 4px 0' }}>
+                    <strong>Status:</strong> {status}
+                    {simulationState.current && (
+                      <span style={{ marginLeft: '8px', fontSize: '0.9em' }}>
+                        ({simulationState.current.currentDistance.toFixed(2)} / {((simulationState.current.totalDistance - simulationState.current.currentDistance)).toFixed(2)} km)
+                      </span>
+                    )}
+                  </p>
                 </IonText>
                 {currentLocation && (
                   <IonText color="medium">
