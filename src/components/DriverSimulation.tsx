@@ -10,10 +10,10 @@ interface DriverSimulationProps {
 }
 
 const DriverSimulation: React.FC<DriverSimulationProps> = ({ onStart, onStop, onPause, onResume }) => {
-  const [startLat, setStartLat] = useState<string>('40.758');
-  const [startLon, setStartLon] = useState<string>('-73.9855');
-  const [endLat, setEndLat] = useState<string>('40.748');
-  const [endLon, setEndLon] = useState<string>('-73.9855');
+  const [startLat, setStartLat] = useState<string>('45.47952470582953');
+  const [startLon, setStartLon] = useState<string>('-73.60287006323539');
+  const [endLat, setEndLat] = useState<string>('45.482225237405856');
+  const [endLon, setEndLon] = useState<string>('-73.59969906693631');
   const [speed, setSpeed] = useState<string>('60');
   const [simState, setSimState] = useState<'idle' | 'running' | 'paused'>('idle');
 
