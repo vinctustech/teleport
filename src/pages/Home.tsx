@@ -21,10 +21,11 @@ const Home: React.FC = () => {
     totalDistance: number;
     currentDistance: number;
   } | null>(null);
+  const onSimulationCompleteRef = useRef<(() => void) | null>(null);
 
-  // Hardcoded test location: Times Square, NYC
-  const TEST_LAT = 40.758;
-  const TEST_LON = -73.9855;
+  // Hardcoded test location: Westmount Public Library, Montreal
+  const TEST_LAT = 45.481643899716715;
+  const TEST_LON = -73.59967887004866;
 
   const handleEnableMockLocation = async () => {
     try {
@@ -135,6 +136,10 @@ const Home: React.FC = () => {
           simulationInterval.current = null;
         }
         simulationState.current = null;
+        // Notify DriverSimulation component to return to idle state
+        if (onSimulationCompleteRef.current) {
+          onSimulationCompleteRef.current();
+        }
       } else {
         // Interpolate current position
         const fraction = simulationState.current.currentDistance / totalDistance;
@@ -247,6 +252,10 @@ const Home: React.FC = () => {
     startSimulationInterval();
   };
 
+  const handleSimulationComplete = (callback: () => void) => {
+    onSimulationCompleteRef.current = callback;
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -285,7 +294,7 @@ const Home: React.FC = () => {
                   1. Enable Mock Location
                 </IonButton>
                 <IonButton expand="block" onClick={handleSetMockLocation} color="secondary">
-                  2. Set Mock Location (Times Square)
+                  2. Set Mock Location (Westmount Library)
                 </IonButton>
                 <IonButton expand="block" onClick={handleGetCurrentLocation} color="success">
                   3. Get Current Location
@@ -345,7 +354,7 @@ const Home: React.FC = () => {
               <IonCardContent>
                 <ol>
                   <li>Click "Enable Mock Location" first</li>
-                  <li>Click "Set Mock Location" to set to Times Square, NYC (40.758, -73.9855)</li>
+                  <li>Click "Set Mock Location" to set to Westmount Public Library, Montreal (45.482, -73.600)</li>
                   <li>Click "Get Current Location" to verify the mock location was set</li>
                 </ol>
                 <IonText color="medium">
@@ -363,6 +372,7 @@ const Home: React.FC = () => {
               onStop={handleSimulationStop}
               onPause={handleSimulationPause}
               onResume={handleSimulationResume}
+              onComplete={handleSimulationComplete}
             />
 
             <IonCard>

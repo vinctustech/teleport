@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, IonRow, IonCol } from '@ionic/react';
+import React, { useState, useEffect } from 'react';
+import { IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonButton, IonRow, IonCol, IonSelect, IonSelectOption } from '@ionic/react';
+import { Preferences } from '@capacitor/preferences';
 import '../pages/Home.css';
 
 interface DriverSimulationProps {
@@ -7,15 +8,113 @@ interface DriverSimulationProps {
   onStop: () => void;
   onPause: () => void;
   onResume: () => void;
+  onComplete: (callback: () => void) => void;
 }
 
-const DriverSimulation: React.FC<DriverSimulationProps> = ({ onStart, onStop, onPause, onResume }) => {
+interface SavedSimulation {
+  name: string;
+  startLat: string;
+  startLon: string;
+  endLat: string;
+  endLon: string;
+  speed: string;
+}
+
+const DriverSimulation: React.FC<DriverSimulationProps> = ({ onStart, onStop, onPause, onResume, onComplete }) => {
+  const [simName, setSimName] = useState<string>('Simulation 1');
   const [startLat, setStartLat] = useState<string>('45.47952470582953');
   const [startLon, setStartLon] = useState<string>('-73.60287006323539');
   const [endLat, setEndLat] = useState<string>('45.482225237405856');
   const [endLon, setEndLon] = useState<string>('-73.59969906693631');
   const [speed, setSpeed] = useState<string>('60');
   const [simState, setSimState] = useState<'idle' | 'running' | 'paused'>('idle');
+  const [savedSimulations, setSavedSimulations] = useState<SavedSimulation[]>([]);
+  const [selectedSim, setSelectedSim] = useState<string>('');
+
+  useEffect(() => {
+    loadSimulations();
+  }, []);
+
+  useEffect(() => {
+    // Register completion callback with parent
+    onComplete(() => {
+      setSimState('idle');
+    });
+  }, [onComplete]);
+
+  const loadSimulations = async () => {
+    const { value } = await Preferences.get({ key: 'savedSimulations' });
+    if (value) {
+      const sims = JSON.parse(value);
+      setSavedSimulations(sims);
+      // Load the first simulation automatically
+      if (sims.length > 0) {
+        const firstSim = sims[0];
+        setSimName(firstSim.name);
+        setStartLat(firstSim.startLat);
+        setStartLon(firstSim.startLon);
+        setEndLat(firstSim.endLat);
+        setEndLon(firstSim.endLon);
+        setSpeed(firstSim.speed);
+        setSelectedSim(firstSim.name);
+      }
+    } else {
+      // First run - create default simulation
+      const defaultSim: SavedSimulation = {
+        name: 'Simulation 1',
+        startLat: '45.47952470582953',
+        startLon: '-73.60287006323539',
+        endLat: '45.482225237405856',
+        endLon: '-73.59969906693631',
+        speed: '60'
+      };
+      const defaultSims = [defaultSim];
+      setSavedSimulations(defaultSims);
+      await Preferences.set({ key: 'savedSimulations', value: JSON.stringify(defaultSims) });
+      // Load the default simulation
+      setSimName(defaultSim.name);
+      setStartLat(defaultSim.startLat);
+      setStartLon(defaultSim.startLon);
+      setEndLat(defaultSim.endLat);
+      setEndLon(defaultSim.endLon);
+      setSpeed(defaultSim.speed);
+      setSelectedSim(defaultSim.name);
+    }
+  };
+
+  const handleSaveSimulation = async () => {
+    if (!simName.trim()) {
+      alert('Please enter a simulation name');
+      return;
+    }
+
+    const newSim: SavedSimulation = {
+      name: simName,
+      startLat,
+      startLon,
+      endLat,
+      endLon,
+      speed
+    };
+
+    const updatedSims = [...savedSimulations.filter(s => s.name !== simName), newSim];
+    setSavedSimulations(updatedSims);
+    await Preferences.set({ key: 'savedSimulations', value: JSON.stringify(updatedSims) });
+    alert(`Simulation "${simName}" saved!`);
+  };
+
+  const handleLoadSimulation = (simName: string) => {
+    const sim = savedSimulations.find(s => s.name === simName);
+    if (sim) {
+      setSimName(sim.name);
+      setStartLat(sim.startLat);
+      setStartLon(sim.startLon);
+      setEndLat(sim.endLat);
+      setEndLon(sim.endLon);
+      setSpeed(sim.speed);
+      setSelectedSim(simName);
+    }
+  };
 
   const handleStart = () => {
     const sLat = parseFloat(startLat);
@@ -50,6 +149,46 @@ const DriverSimulation: React.FC<DriverSimulationProps> = ({ onStart, onStop, on
 
   return (
     <>
+      <IonCard>
+        <IonCardHeader>
+          <IonCardTitle>Simulation</IonCardTitle>
+        </IonCardHeader>
+        <IonCardContent>
+          <IonItem>
+            <IonLabel position="stacked">Name</IonLabel>
+            <IonInput
+              type="text"
+              value={simName}
+              onIonInput={(e) => setSimName(e.detail.value!)}
+              disabled={simState !== 'idle'}
+            />
+          </IonItem>
+          <IonRow style={{ marginTop: '8px' }}>
+            <IonCol size="6">
+              <IonButton expand="block" onClick={handleSaveSimulation} disabled={simState !== 'idle'}>
+                Save
+              </IonButton>
+            </IonCol>
+            <IonCol size="6">
+              <IonItem>
+                <IonSelect
+                  value={selectedSim}
+                  placeholder="Load saved"
+                  onIonChange={(e) => handleLoadSimulation(e.detail.value)}
+                  disabled={simState !== 'idle'}
+                >
+                  {savedSimulations.map((sim) => (
+                    <IonSelectOption key={sim.name} value={sim.name}>
+                      {sim.name}
+                    </IonSelectOption>
+                  ))}
+                </IonSelect>
+              </IonItem>
+            </IonCol>
+          </IonRow>
+        </IonCardContent>
+      </IonCard>
+
       <IonCard>
         <IonCardHeader>
           <IonCardTitle>Start Location</IonCardTitle>
