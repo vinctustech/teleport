@@ -4,7 +4,7 @@ export interface LocationMockerPlugin {
   /**
    * Set a mock location
    */
-  setMockLocation(options: { latitude: number; longitude: number; accuracy?: number }): Promise<{ success: boolean }>;
+  setMockLocation(options: { latitude: number; longitude: number; accuracy?: number; bearing?: number }): Promise<{ success: boolean }>;
 
   /**
    * Get current location (for verification)

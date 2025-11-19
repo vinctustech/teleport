@@ -28,6 +28,23 @@ const Home: React.FC = () => {
   const TEST_LAT = 45.481643899716715;
   const TEST_LON = -73.59967887004866;
 
+  // Calculate bearing between two points (returns degrees from north, 0-360)
+  const calculateBearing = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const toRad = (deg: number) => deg * Math.PI / 180;
+    const toDeg = (rad: number) => rad * 180 / Math.PI;
+
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const λ1 = toRad(lon1);
+    const λ2 = toRad(lon2);
+
+    const y = Math.sin(λ2 - λ1) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
+    const θ = Math.atan2(y, x);
+
+    return (toDeg(θ) + 360) % 360; // Normalize to 0-360
+  };
+
   const handleEnableMockLocation = async () => {
     try {
       setStatus('Enabling mock location...');
@@ -124,25 +141,20 @@ const Home: React.FC = () => {
 
       if (simulationState.current.currentDistance >= totalDistance) {
         // Calculate bearing from start to end
+        const bearing = calculateBearing(startLat, startLon, endLat, endLon);
         const toRad = (deg: number) => deg * Math.PI / 180;
         const toDeg = (rad: number) => rad * 180 / Math.PI;
 
-        const φ1 = toRad(startLat);
         const φ2 = toRad(endLat);
-        const λ1 = toRad(startLon);
         const λ2 = toRad(endLon);
-
-        // Calculate bearing
-        const y = Math.sin(λ2 - λ1) * Math.cos(φ2);
-        const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
-        const bearing = Math.atan2(y, x);
 
         // Calculate point 20m (0.02 km) beyond endpoint
         const R = 6371; // Earth's radius in km
         const d = 0.02; // 20 meters in km
+        const bearingRad = toRad(bearing);
 
-        const φ3 = Math.asin(Math.sin(φ2) * Math.cos(d / R) + Math.cos(φ2) * Math.sin(d / R) * Math.cos(bearing));
-        const λ3 = λ2 + Math.atan2(Math.sin(bearing) * Math.sin(d / R) * Math.cos(φ2), Math.cos(d / R) - Math.sin(φ2) * Math.sin(φ3));
+        const φ3 = Math.asin(Math.sin(φ2) * Math.cos(d / R) + Math.cos(φ2) * Math.sin(d / R) * Math.cos(bearingRad));
+        const λ3 = λ2 + Math.atan2(Math.sin(bearingRad) * Math.sin(d / R) * Math.cos(φ2), Math.cos(d / R) - Math.sin(φ2) * Math.sin(φ3));
 
         const finalLat = toDeg(φ3);
         const finalLon = toDeg(λ3);
@@ -152,6 +164,7 @@ const Home: React.FC = () => {
           latitude: finalLat,
           longitude: finalLon,
           accuracy: 1.0,
+          bearing: bearing,
         });
         setCurrentLocation({ latitude: finalLat, longitude: finalLon, accuracy: 1.0 });
         setStatus('Arrived at destination');
@@ -170,6 +183,7 @@ const Home: React.FC = () => {
             latitude: finalLat,
             longitude: finalLon,
             accuracy: 1.0,
+            bearing: bearing,
           });
           // Notify DriverSimulation component to return to idle state
           if (onSimulationCompleteRef.current) {
@@ -182,10 +196,14 @@ const Home: React.FC = () => {
         const currentLat = startLat + (endLat - startLat) * fraction;
         const currentLon = startLon + (endLon - startLon) * fraction;
 
+        // Calculate bearing from start to end
+        const bearing = calculateBearing(startLat, startLon, endLat, endLon);
+
         await LocationMocker.setMockLocation({
           latitude: currentLat,
           longitude: currentLon,
           accuracy: 1.0,
+          bearing: bearing,
         });
         setCurrentLocation({ latitude: currentLat, longitude: currentLon, accuracy: 1.0 });
       }

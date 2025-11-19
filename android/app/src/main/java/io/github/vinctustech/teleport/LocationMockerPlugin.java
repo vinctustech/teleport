@@ -117,6 +117,7 @@ public class LocationMockerPlugin extends Plugin {
         Double latitude = call.getDouble("latitude");
         Double longitude = call.getDouble("longitude");
         Double accuracy = call.getDouble("accuracy", 1.0);
+        Double bearing = call.getDouble("bearing");
 
         if (latitude == null || longitude == null) {
             call.reject("Must provide latitude and longitude");
@@ -135,6 +136,10 @@ public class LocationMockerPlugin extends Plugin {
             mockLocation.setAccuracy(accuracy.floatValue());
             mockLocation.setTime(System.currentTimeMillis());
             mockLocation.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
+
+            if (bearing != null) {
+                mockLocation.setBearing(bearing.floatValue());
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 mockLocation.setBearingAccuracyDegrees(0.1f);
