@@ -1,0 +1,81 @@
+.map-card {
+  margin-top: 8px;
+}
+
+.map-container {
+  /* Use viewport height minus space for header (~56px) and route planning card */
+  height: calc(100vh - 465px);
+  min-height: 200px;
+  max-height: 500px;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.route-info {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--ion-color-light);
+  border-radius: 8px;
+}
+
+.route-info p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Fix Leaflet controls in dark mode */
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.8) !important;
+}
+
+.leaflet-control-zoom a {
+  background: white !important;
+  color: black !important;
+}
+
+/* Fix input styling */
+ion-item {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+}
+
+/* Autocomplete styles */
+.autocomplete-container {
+  position: relative;
+}
+
+.suggestions-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--ion-background-color, #fff);
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+}
+
+.suggestion-item {
+  --padding-start: 12px;
+  --inner-padding-end: 12px;
+  cursor: pointer;
+}
+
+.suggestion-item:hover {
+  --background: var(--ion-color-light);
+}
+
+.suggestion-label {
+  font-size: 0.9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

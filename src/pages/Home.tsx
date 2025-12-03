@@ -1,8 +1,9 @@
 import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonText, IonButtons, IonIcon, IonProgressBar } from '@ionic/react';
 import { useState, useRef } from 'react';
-import { flask, car } from 'ionicons/icons';
+import { flask, car, map } from 'ionicons/icons';
 import LocationMocker from '../plugins/LocationMocker';
 import DriverSimulation from '../components/DriverSimulation';
+import MapRoute from '../components/MapRoute';
 import { version } from '../../package.json';
 import './Home.css';
 
@@ -10,7 +11,7 @@ const Home: React.FC = () => {
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
   const [status, setStatus] = useState<string>('Ready');
   const [error, setError] = useState<string | null>(null);
-  const [activeScreen, setActiveScreen] = useState<'test' | 'simulation'>('test');
+  const [activeScreen, setActiveScreen] = useState<'test' | 'simulation' | 'map'>('test');
   const [progress, setProgress] = useState<number>(0);
   const simulationInterval = useRef<NodeJS.Timeout | null>(null);
   const simulationState = useRef<{
@@ -330,6 +331,9 @@ const Home: React.FC = () => {
             <IonButton onClick={() => setActiveScreen('simulation')} color={activeScreen === 'simulation' ? 'primary' : 'medium'}>
               <IonIcon slot="icon-only" icon={car} />
             </IonButton>
+            <IonButton onClick={() => setActiveScreen('map')} color={activeScreen === 'map' ? 'primary' : 'medium'}>
+              <IonIcon slot="icon-only" icon={map} />
+            </IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
@@ -463,6 +467,15 @@ const Home: React.FC = () => {
               </IonCardContent>
             </IonCard>
           </>
+        )}
+
+        {activeScreen === 'map' && (
+          <MapRoute
+            onStartSimulation={handleSimulationStart}
+            onStopSimulation={handleSimulationStop}
+            currentLocation={currentLocation}
+            isSimulating={!!simulationInterval.current}
+          />
         )}
       </IonContent>
     </IonPage>
