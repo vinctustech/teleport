@@ -56,8 +56,8 @@ const Home: React.FC = () => {
         setStatus('Mock location enabled');
         setProgress(1);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to enable mock location');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to enable mock location');
       setStatus('Error');
       setProgress(0);
     }
@@ -77,8 +77,8 @@ const Home: React.FC = () => {
         setStatus(`Mock location set to: ${TEST_LAT}, ${TEST_LON}`);
         setProgress(1);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to set mock location');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to set mock location');
       setStatus('Error');
       setProgress(0);
     }
@@ -93,8 +93,8 @@ const Home: React.FC = () => {
       setCurrentLocation(location);
       setStatus('Location retrieved');
       setProgress(1);
-    } catch (err: any) {
-      setError(err.message || 'Failed to get current location');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get current location');
       setStatus('Error');
       setProgress(0);
     }
@@ -111,8 +111,8 @@ const Home: React.FC = () => {
         setCurrentLocation(null);
         setProgress(0);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to disable mock location');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to disable mock location');
       setStatus('Error');
       setProgress(0);
     }
@@ -255,8 +255,8 @@ const Home: React.FC = () => {
       // Start the simulation interval
       startSimulationInterval();
 
-    } catch (err: any) {
-      setError(err.message || 'Failed to start simulation');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start simulation');
       setStatus('Error');
       setProgress(0);
       if (simulationInterval.current) {
@@ -285,8 +285,8 @@ const Home: React.FC = () => {
       setStatus('Simulation stopped');
       setProgress(0);
       setCurrentLocation(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to stop simulation');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to stop simulation');
       setStatus('Error');
       setProgress(0);
     }

@@ -3,8 +3,7 @@
 }
 
 .map-container {
-  /* Use viewport height minus space for header (~56px) and route planning card */
-  height: calc(100vh - 465px);
+  height: calc(100vh - 515px);
   min-height: 200px;
   max-height: 500px;
   width: 100%;
@@ -12,11 +11,19 @@
   overflow: hidden;
 }
 
-.route-info {
+/* Route info container - fixed height to prevent layout shift */
+.route-info-container {
   margin-top: 12px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.route-info {
   padding: 8px 12px;
   background: var(--ion-color-light);
   border-radius: 8px;
+  width: 100%;
 }
 
 .route-info p {
@@ -24,6 +31,23 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.route-info-placeholder {
+  padding: 8px 12px;
+  width: 100%;
+}
+
+.route-info-placeholder p {
+  margin: 0;
+  font-size: 0.9em;
+}
+
+.route-info-loading {
+  padding: 8px 12px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
 /* Fix Leaflet controls in dark mode */
@@ -36,46 +60,57 @@
   color: black !important;
 }
 
-/* Fix input styling */
-ion-item {
-  --padding-start: 0;
-  --inner-padding-end: 0;
-}
-
-/* Autocomplete styles */
-.autocomplete-container {
+/* Search field styles */
+.search-field {
   position: relative;
 }
 
+/* Stagger z-index so first dropdown appears on top */
+.search-field:nth-child(1) {
+  z-index: 103;
+}
+.search-field:nth-child(2) {
+  z-index: 102;
+}
+.search-field:nth-child(3) {
+  z-index: 101;
+}
+
+/* Suggestions dropdown */
 .suggestions-list {
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
-  z-index: 1000;
-  background: var(--ion-background-color, #fff);
-  border: 1px solid var(--ion-color-light-shade);
-  border-radius: 0 0 8px 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  max-height: 200px;
+  background: var(--ion-item-background, var(--ion-background-color));
+  border: 1px solid var(--ion-color-step-300, #444);
+  border-radius: 8px;
+  margin-top: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  max-height: 250px;
   overflow-y: auto;
-  margin: 0;
   padding: 0;
 }
 
-.suggestion-item {
+.suggestions-list ion-item {
   --padding-start: 12px;
   --inner-padding-end: 12px;
+  --min-height: 56px;
   cursor: pointer;
 }
 
-.suggestion-item:hover {
-  --background: var(--ion-color-light);
+.suggestions-list ion-item:last-child {
+  --border-width: 0;
 }
 
-.suggestion-label {
-  font-size: 0.9em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.suggestions-list ion-label h3 {
+  font-size: 0.95em;
+  font-weight: 500;
+  margin-bottom: 2px;
 }
+
+.suggestions-list ion-label p {
+  font-size: 0.8em;
+  color: var(--ion-color-medium);
+}
+

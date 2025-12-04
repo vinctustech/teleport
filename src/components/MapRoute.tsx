@@ -13,11 +13,14 @@ import {
   IonIcon,
   IonList,
 } from '@ionic/react';
-import { navigate, play, stop, location } from 'ionicons/icons';
+import { navigate, play, stop } from 'ionicons/icons';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './MapRoute.css';
+import { SearchBoxCore, SessionToken } from '@mapbox/search-js-core';
+
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiZWRhZG1hLXRlbGVwb3J0IiwiYSI6ImNtaXJtc29nbjA4d3czZW9kYjVsOW8xNjkifQ.iX4d_eQkCMZ2N52GxMMVLg';
 
 // Fix Leaflet default marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -67,22 +70,22 @@ interface MapRouteProps {
   isSimulating: boolean;
 }
 
-interface GeocodingResult {
-  lat: string;
-  lon: string;
-  display_name: string;
-}
-
-interface AutocompleteOption {
-  lat: number;
-  lon: number;
-  label: string;
+interface Suggestion {
+  mapbox_id: string;
+  name: string;
+  full_address?: string;
+  place_formatted?: string;
+  context?: {
+    place?: { name: string };
+    region?: { name: string };
+    country?: { name: string };
+  };
 }
 
 interface RouteInfo {
-  distance: number; // meters
-  duration: number; // seconds
-  geometry: [number, number][]; // [lat, lon] pairs
+  distance: number;
+  duration: number;
+  geometry: [number, number][];
 }
 
 // Component to update map view when bounds change
@@ -100,16 +103,13 @@ const MapBoundsUpdater: React.FC<{ bounds: L.LatLngBoundsExpression | null }> = 
 const MapSizeInvalidator: React.FC = () => {
   const map = useMap();
   useEffect(() => {
-    // Invalidate size immediately and after delays
     map.invalidateSize();
     const timeout1 = setTimeout(() => map.invalidateSize(), 100);
     const timeout2 = setTimeout(() => map.invalidateSize(), 500);
 
-    // Also invalidate on any resize
     const handleResize = () => map.invalidateSize();
     window.addEventListener('resize', handleResize);
 
-    // Invalidate after move/zoom to fix tile loading issues
     const handleMoveEnd = () => {
       setTimeout(() => map.invalidateSize(), 50);
     };
@@ -133,183 +133,168 @@ const MapRoute: React.FC<MapRouteProps> = ({
   currentLocation,
   isSimulating,
 }) => {
-  const [startAddress, setStartAddress] = useState('');
-  const [endAddress, setEndAddress] = useState('');
-  const [biasLocation, setBiasLocation] = useState('Montreal, QC');
-  const [biasCoords, setBiasCoords] = useState<{ lat: number; lon: number } | null>({ lat: 45.5017, lon: -73.5673 });
+  // Coordinates state
+  const [biasCoords, setBiasCoords] = useState<{ lat: number; lon: number }>({ lat: 45.5017, lon: -73.5673 });
   const [startCoords, setStartCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [endCoords, setEndCoords] = useState<{ lat: number; lon: number } | null>(null);
+
+  // Input values
+  const [biasInput, setBiasInput] = useState('Montreal, QC');
+  const [startInput, setStartInput] = useState('');
+  const [endInput, setEndInput] = useState('');
+
+  // Suggestions state
+  const [biasSuggestions, setBiasSuggestions] = useState<Suggestion[]>([]);
+  const [startSuggestions, setStartSuggestions] = useState<Suggestion[]>([]);
+  const [endSuggestions, setEndSuggestions] = useState<Suggestion[]>([]);
+  const [showBiasSuggestions, setShowBiasSuggestions] = useState(false);
+  const [showStartSuggestions, setShowStartSuggestions] = useState(false);
+  const [showEndSuggestions, setShowEndSuggestions] = useState(false);
+
+  // Other state
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [speed, setSpeed] = useState(40);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mapBounds, setMapBounds] = useState<L.LatLngBoundsExpression | null>(null);
 
-  // Autocomplete state
-  const [startSuggestions, setStartSuggestions] = useState<AutocompleteOption[]>([]);
-  const [endSuggestions, setEndSuggestions] = useState<AutocompleteOption[]>([]);
-  const [showStartSuggestions, setShowStartSuggestions] = useState(false);
-  const [showEndSuggestions, setShowEndSuggestions] = useState(false);
-  const [biasSuggestions, setBiasSuggestions] = useState<AutocompleteOption[]>([]);
-  const [showBiasSuggestions, setShowBiasSuggestions] = useState(false);
-
-  // Refs for debouncing
-  const startDebounceRef = useRef<NodeJS.Timeout | null>(null);
-  const endDebounceRef = useRef<NodeJS.Timeout | null>(null);
-  const biasDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  // Refs
+  const searchBoxRef = useRef<SearchBoxCore | null>(null);
+  const sessionTokenRef = useRef<SessionToken | null>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Default center (Montreal)
   const defaultCenter: [number, number] = [45.5017, -73.5673];
 
-  // Geocode an address using Nominatim
-  const geocodeAddress = async (address: string): Promise<GeocodingResult | null> => {
+  // Initialize Mapbox search
+  useEffect(() => {
+    searchBoxRef.current = new SearchBoxCore({ accessToken: MAPBOX_TOKEN });
+    sessionTokenRef.current = new SessionToken();
+  }, []);
+
+  // Fetch suggestions
+  const fetchSuggestions = useCallback(async (
+    query: string,
+    proximity: { lat: number; lon: number } | null,
+    types?: string
+  ): Promise<Suggestion[]> => {
+    if (query.length < 2 || !searchBoxRef.current || !sessionTokenRef.current) {
+      return [];
+    }
+
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
-        {
-          headers: {
-            'User-Agent': 'Teleport GPS Testing App',
-          },
-        }
+      const options: Parameters<SearchBoxCore['suggest']>[1] = {
+        sessionToken: sessionTokenRef.current,
+        language: 'en',
+        limit: 5,
+      };
+
+      if (proximity) {
+        // Set proximity for ranking bias
+        options.proximity = [proximity.lon, proximity.lat];
+        // Add bounding box to restrict results (~150km radius around bias point)
+        const latOffset = 1.35; // ~150km
+        const lonOffset = 1.8;  // ~150km at mid-latitudes
+        options.bbox = [
+          proximity.lon - lonOffset, // west
+          proximity.lat - latOffset, // south
+          proximity.lon + lonOffset, // east
+          proximity.lat + latOffset, // north
+        ];
+      }
+
+      if (types) {
+        options.types = types;
+      }
+
+      const response = await searchBoxRef.current.suggest(query, options);
+      return response.suggestions || [];
+    } catch (err) {
+      console.error('Mapbox suggest error:', err);
+      return [];
+    }
+  }, []);
+
+  // Retrieve coordinates for a suggestion
+  const retrieveCoordinates = useCallback(async (mapboxId: string): Promise<{ lat: number; lon: number } | null> => {
+    if (!searchBoxRef.current || !sessionTokenRef.current) return null;
+
+    try {
+      const result = await searchBoxRef.current.retrieve(
+        { mapbox_id: mapboxId } as Parameters<SearchBoxCore['retrieve']>[0],
+        { sessionToken: sessionTokenRef.current }
       );
-      const results = await response.json();
-      if (results && results.length > 0) {
-        return results[0];
+
+      if (result.features && result.features.length > 0) {
+        const [lon, lat] = result.features[0].geometry.coordinates;
+        sessionTokenRef.current = new SessionToken();
+        return { lat, lon };
       }
       return null;
     } catch (err) {
-      console.error('Geocoding error:', err);
+      console.error('Mapbox retrieve error:', err);
       return null;
     }
-  };
+  }, []);
 
-  // Extract short location name from full address for query biasing
-  const getShortBiasName = useCallback((): string => {
-    if (!biasLocation) return '';
-    // Get first part before comma (usually city name)
-    const parts = biasLocation.split(',');
-    return parts[0].trim();
-  }, [biasLocation]);
-
-  // Fetch autocomplete suggestions from Nominatim (with optional bias)
-  const fetchSuggestions = useCallback(async (query: string, useBias: boolean = true): Promise<AutocompleteOption[]> => {
-    if (query.length < 3) {
-      return [];
+  // Debounced search handler
+  const handleSearch = useCallback((
+    value: string,
+    setSuggestions: React.Dispatch<React.SetStateAction<Suggestion[]>>,
+    setShow: React.Dispatch<React.SetStateAction<boolean>>,
+    proximity: { lat: number; lon: number } | null,
+    types?: string
+  ) => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
     }
-    try {
-      // Append bias location name to query for better local results
-      let searchQuery = query;
-      if (useBias && biasCoords) {
-        const biasName = getShortBiasName();
-        if (biasName && !query.toLowerCase().includes(biasName.toLowerCase())) {
-          searchQuery = `${query} ${biasName}`;
-        }
+
+    if (value.length < 2) {
+      setSuggestions([]);
+      setShow(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      const suggestions = await fetchSuggestions(value, proximity, types);
+      setSuggestions(suggestions);
+      setShow(suggestions.length > 0);
+    }, 200);
+  }, [fetchSuggestions]);
+
+  // Handle suggestion selection
+  const handleSelect = useCallback(async (
+    suggestion: Suggestion,
+    setInput: React.Dispatch<React.SetStateAction<string>>,
+    setCoords: React.Dispatch<React.SetStateAction<{ lat: number; lon: number } | null>> | React.Dispatch<React.SetStateAction<{ lat: number; lon: number }>>,
+    setSuggestions: React.Dispatch<React.SetStateAction<Suggestion[]>>,
+    setShow: React.Dispatch<React.SetStateAction<boolean>>,
+    isBiasField?: boolean
+  ) => {
+    let displayName: string;
+    if (isBiasField) {
+      // For bias field, show "City, Region, Country" format
+      const parts = [suggestion.name];
+      if (suggestion.context?.region?.name) {
+        parts.push(suggestion.context.region.name);
       }
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=5&addressdetails=1`;
-      const response = await fetch(url, {
-        headers: { 'User-Agent': 'Teleport GPS Testing App' },
-      });
-      const data = await response.json();
-      if (data && data.length > 0) {
-        return data.map((item: GeocodingResult) => ({
-          lat: parseFloat(item.lat),
-          lon: parseFloat(item.lon),
-          label: item.display_name,
-        }));
+      if (suggestion.context?.country?.name) {
+        parts.push(suggestion.context.country.name);
       }
-      return [];
-    } catch (err) {
-      console.error('Autocomplete error:', err);
-      return [];
-    }
-  }, [biasCoords, getShortBiasName]);
-
-  // Debounced autocomplete for bias location (unbiased search)
-  const handleBiasAddressChange = (value: string) => {
-    setBiasLocation(value);
-    setBiasCoords(null); // Clear coords when typing
-
-    if (biasDebounceRef.current) {
-      clearTimeout(biasDebounceRef.current);
-    }
-
-    if (value.length >= 3) {
-      biasDebounceRef.current = setTimeout(async () => {
-        const suggestions = await fetchSuggestions(value, false); // unbiased
-        setBiasSuggestions(suggestions);
-        setShowBiasSuggestions(suggestions.length > 0);
-      }, 150);
+      displayName = parts.join(', ');
     } else {
-      setBiasSuggestions([]);
-      setShowBiasSuggestions(false);
+      // For addresses, show full address
+      displayName = suggestion.full_address || suggestion.place_formatted || suggestion.name;
     }
-  };
+    setInput(displayName);
+    setSuggestions([]);
+    setShow(false);
 
-  // Handle selecting a bias suggestion
-  const handleBiasSelect = (option: AutocompleteOption) => {
-    setBiasLocation(option.label);
-    setBiasCoords({ lat: option.lat, lon: option.lon });
-    setShowBiasSuggestions(false);
-    setBiasSuggestions([]);
-  };
-
-  // Debounced autocomplete for start address
-  const handleStartAddressChange = (value: string) => {
-    setStartAddress(value);
-    setStartCoords(null); // Clear coords when typing
-
-    if (startDebounceRef.current) {
-      clearTimeout(startDebounceRef.current);
+    const coords = await retrieveCoordinates(suggestion.mapbox_id);
+    if (coords) {
+      setCoords(coords);
     }
-
-    if (value.length >= 3) {
-      startDebounceRef.current = setTimeout(async () => {
-        const suggestions = await fetchSuggestions(value);
-        setStartSuggestions(suggestions);
-        setShowStartSuggestions(suggestions.length > 0);
-      }, 150);
-    } else {
-      setStartSuggestions([]);
-      setShowStartSuggestions(false);
-    }
-  };
-
-  // Debounced autocomplete for end address
-  const handleEndAddressChange = (value: string) => {
-    setEndAddress(value);
-    setEndCoords(null); // Clear coords when typing
-
-    if (endDebounceRef.current) {
-      clearTimeout(endDebounceRef.current);
-    }
-
-    if (value.length >= 3) {
-      endDebounceRef.current = setTimeout(async () => {
-        const suggestions = await fetchSuggestions(value);
-        setEndSuggestions(suggestions);
-        setShowEndSuggestions(suggestions.length > 0);
-      }, 150);
-    } else {
-      setEndSuggestions([]);
-      setShowEndSuggestions(false);
-    }
-  };
-
-  // Handle selecting a start suggestion
-  const handleStartSelect = (option: AutocompleteOption) => {
-    setStartAddress(option.label);
-    setStartCoords({ lat: option.lat, lon: option.lon });
-    setShowStartSuggestions(false);
-    setStartSuggestions([]);
-  };
-
-  // Handle selecting an end suggestion
-  const handleEndSelect = (option: AutocompleteOption) => {
-    setEndAddress(option.label);
-    setEndCoords({ lat: option.lat, lon: option.lon });
-    setShowEndSuggestions(false);
-    setEndSuggestions([]);
-  };
+  }, [retrieveCoordinates]);
 
   // Get route from OSRM
   const getRoute = async (
@@ -319,14 +304,12 @@ const MapRoute: React.FC<MapRouteProps> = ({
     endLon: number
   ): Promise<RouteInfo | null> => {
     try {
-      // Using public OSRM demo server
       const response = await fetch(
         `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`
       );
       const data = await response.json();
       if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
         const route = data.routes[0];
-        // Convert GeoJSON coordinates [lon, lat] to [lat, lon] for Leaflet
         const geometry: [number, number][] = route.geometry.coordinates.map(
           (coord: [number, number]) => [coord[1], coord[0]]
         );
@@ -343,16 +326,15 @@ const MapRoute: React.FC<MapRouteProps> = ({
     }
   };
 
-
   // Fetch route when both coordinates are set
   useEffect(() => {
     const fetchRoute = async () => {
       if (startCoords && endCoords) {
         setLoading(true);
+        setError(null);
         const route = await getRoute(startCoords.lat, startCoords.lon, endCoords.lat, endCoords.lon);
         if (route) {
           setRouteInfo(route);
-          // Update map bounds to fit route
           const bounds = L.latLngBounds(route.geometry);
           setMapBounds(bounds);
         } else {
@@ -381,18 +363,17 @@ const MapRoute: React.FC<MapRouteProps> = ({
 
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
     if (mins >= 60) {
       const hours = Math.floor(mins / 60);
       const remainingMins = mins % 60;
       return `${hours}h ${remainingMins}m`;
     }
-    return `${mins}m ${secs}s`;
+    return `${mins}m`;
   };
 
   const formatDistance = (meters: number): string => {
     if (meters >= 1000) {
-      return `${(meters / 1000).toFixed(2)} km`;
+      return `${(meters / 1000).toFixed(1)} km`;
     }
     return `${Math.round(meters)} m`;
   };
@@ -404,105 +385,125 @@ const MapRoute: React.FC<MapRouteProps> = ({
           <IonCardTitle>Route Planning</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
-          {/* Location Bias Field with Autocomplete */}
-          <div className="autocomplete-container">
+          {/* Location Bias Field */}
+          <div className="search-field">
             <IonItem>
-              <IonIcon icon={location} slot="start" color="medium" />
               <IonLabel position="stacked">Search Bias (city/region)</IonLabel>
               <IonInput
-                value={biasLocation}
-                onIonInput={(e) => handleBiasAddressChange(e.detail.value || '')}
+                value={biasInput}
                 placeholder="e.g., Montreal, QC"
-                disabled={isSimulating}
+                onIonInput={(e) => {
+                  const value = e.detail.value || '';
+                  setBiasInput(value);
+                  handleSearch(value, setBiasSuggestions, setShowBiasSuggestions, null, 'place,locality,neighborhood');
+                }}
                 onIonFocus={() => biasSuggestions.length > 0 && setShowBiasSuggestions(true)}
                 onIonBlur={() => setTimeout(() => setShowBiasSuggestions(false), 200)}
+                disabled={isSimulating}
               />
-              {biasCoords && (
-                <IonText slot="end" color="success" style={{ fontSize: '0.8em' }}>
-                  ✓
-                </IonText>
-              )}
             </IonItem>
             {showBiasSuggestions && biasSuggestions.length > 0 && (
               <IonList className="suggestions-list">
-                {biasSuggestions.map((option, index) => (
+                {biasSuggestions.map((suggestion) => (
                   <IonItem
-                    key={index}
+                    key={suggestion.mapbox_id}
                     button
-                    onClick={() => handleBiasSelect(option)}
-                    className="suggestion-item"
+                    onClick={() => handleSelect(suggestion, setBiasInput, setBiasCoords, setBiasSuggestions, setShowBiasSuggestions, true)}
                   >
-                    <IonLabel className="suggestion-label">{option.label}</IonLabel>
+                    <IonLabel>
+                      <h3>{suggestion.name}</h3>
+                      <p>{suggestion.place_formatted}</p>
+                    </IonLabel>
                   </IonItem>
                 ))}
               </IonList>
             )}
           </div>
 
-          {/* Start Address with Autocomplete */}
-          <div className="autocomplete-container">
+          {/* Start Address */}
+          <div className="search-field">
             <IonItem>
-              <IonLabel position="stacked">Start Address</IonLabel>
+              <IonLabel position="stacked">
+                Start Address {startCoords && <IonText color="success">✓</IonText>}
+              </IonLabel>
               <IonInput
-                value={startAddress}
-                onIonInput={(e) => handleStartAddressChange(e.detail.value || '')}
+                value={startInput}
                 placeholder="Type to search..."
-                disabled={isSimulating}
+                onIonInput={(e) => {
+                  const value = e.detail.value || '';
+                  setStartInput(value);
+                  setStartCoords(null);
+                  handleSearch(value, setStartSuggestions, setShowStartSuggestions, biasCoords);
+                }}
                 onIonFocus={() => startSuggestions.length > 0 && setShowStartSuggestions(true)}
                 onIonBlur={() => setTimeout(() => setShowStartSuggestions(false), 200)}
+                disabled={isSimulating}
               />
-              {startCoords && (
-                <IonText slot="end" color="success" style={{ fontSize: '0.8em' }}>
-                  ✓
-                </IonText>
-              )}
             </IonItem>
             {showStartSuggestions && startSuggestions.length > 0 && (
               <IonList className="suggestions-list">
-                {startSuggestions.map((option, index) => (
-                  <IonItem
-                    key={index}
-                    button
-                    onClick={() => handleStartSelect(option)}
-                    className="suggestion-item"
-                  >
-                    <IonLabel className="suggestion-label">{option.label}</IonLabel>
-                  </IonItem>
-                ))}
+                {startSuggestions.map((suggestion) => {
+                  const city = suggestion.context?.place?.name;
+                  const subtitle = city
+                    ? `${city}, ${suggestion.place_formatted || suggestion.full_address || ''}`
+                    : (suggestion.place_formatted || suggestion.full_address);
+                  return (
+                    <IonItem
+                      key={suggestion.mapbox_id}
+                      button
+                      onClick={() => handleSelect(suggestion, setStartInput, setStartCoords, setStartSuggestions, setShowStartSuggestions)}
+                    >
+                      <IonLabel>
+                        <h3>{suggestion.name}</h3>
+                        <p>{subtitle}</p>
+                      </IonLabel>
+                    </IonItem>
+                  );
+                })}
               </IonList>
             )}
           </div>
 
-          {/* End Address with Autocomplete */}
-          <div className="autocomplete-container">
+          {/* End Address */}
+          <div className="search-field">
             <IonItem>
-              <IonLabel position="stacked">End Address</IonLabel>
+              <IonLabel position="stacked">
+                End Address {endCoords && <IonText color="success">✓</IonText>}
+              </IonLabel>
               <IonInput
-                value={endAddress}
-                onIonInput={(e) => handleEndAddressChange(e.detail.value || '')}
+                value={endInput}
                 placeholder="Type to search..."
-                disabled={isSimulating}
+                onIonInput={(e) => {
+                  const value = e.detail.value || '';
+                  setEndInput(value);
+                  setEndCoords(null);
+                  handleSearch(value, setEndSuggestions, setShowEndSuggestions, biasCoords);
+                }}
                 onIonFocus={() => endSuggestions.length > 0 && setShowEndSuggestions(true)}
                 onIonBlur={() => setTimeout(() => setShowEndSuggestions(false), 200)}
+                disabled={isSimulating}
               />
-              {endCoords && (
-                <IonText slot="end" color="success" style={{ fontSize: '0.8em' }}>
-                  ✓
-                </IonText>
-              )}
             </IonItem>
             {showEndSuggestions && endSuggestions.length > 0 && (
               <IonList className="suggestions-list">
-                {endSuggestions.map((option, index) => (
-                  <IonItem
-                    key={index}
-                    button
-                    onClick={() => handleEndSelect(option)}
-                    className="suggestion-item"
-                  >
-                    <IonLabel className="suggestion-label">{option.label}</IonLabel>
-                  </IonItem>
-                ))}
+                {endSuggestions.map((suggestion) => {
+                  const city = suggestion.context?.place?.name;
+                  const subtitle = city
+                    ? `${city}, ${suggestion.place_formatted || suggestion.full_address || ''}`
+                    : (suggestion.place_formatted || suggestion.full_address);
+                  return (
+                    <IonItem
+                      key={suggestion.mapbox_id}
+                      button
+                      onClick={() => handleSelect(suggestion, setEndInput, setEndCoords, setEndSuggestions, setShowEndSuggestions)}
+                    >
+                      <IonLabel>
+                        <h3>{suggestion.name}</h3>
+                        <p>{subtitle}</p>
+                      </IonLabel>
+                    </IonItem>
+                  );
+                })}
               </IonList>
             )}
           </div>
@@ -523,22 +524,29 @@ const MapRoute: React.FC<MapRouteProps> = ({
             </IonText>
           )}
 
-          {loading && (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}>
-              <IonSpinner />
-            </div>
-          )}
-
-          {routeInfo && (
-            <div className="route-info">
-              <IonText color="primary">
-                <p>
-                  <IonIcon icon={navigate} /> {formatDistance(routeInfo.distance)} •{' '}
-                  {formatDuration(routeInfo.duration)} (OSRM)
-                </p>
-              </IonText>
-            </div>
-          )}
+          {/* Reserved space for route info to prevent layout shift */}
+          <div className="route-info-container">
+            {loading ? (
+              <div className="route-info-loading">
+                <IonSpinner name="dots" />
+              </div>
+            ) : routeInfo ? (
+              <div className="route-info">
+                <IonText color="primary">
+                  <p>
+                    <IonIcon icon={navigate} /> {formatDistance(routeInfo.distance)} •{' '}
+                    {formatDuration(routeInfo.duration)}
+                  </p>
+                </IonText>
+              </div>
+            ) : (
+              <div className="route-info-placeholder">
+                <IonText color="medium">
+                  <p>Enter start and end addresses</p>
+                </IonText>
+              </div>
+            )}
+          </div>
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
             {!isSimulating ? (
