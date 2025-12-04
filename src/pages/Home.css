@@ -50,3 +50,15 @@ ion-item {
   flex: 1;
   align-items: center;
 }
+
+/* View icons in toolbar */
+.view-icons {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.view-icons ion-button {
+  --padding-start: 4px;
+  --padding-end: 4px;
+}

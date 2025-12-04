@@ -1,4 +1,4 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonText, IonButtons, IonIcon, IonProgressBar } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonText, IonIcon, IonProgressBar } from '@ionic/react';
 import { useState, useRef } from 'react';
 import { flask, car, map } from 'ionicons/icons';
 import LocationMocker from '../plugins/LocationMocker';
@@ -541,17 +541,17 @@ const Home: React.FC = () => {
               <span style={{ fontSize: '0.9em', fontWeight: '400', opacity: '0.7', alignSelf: 'flex-end', marginBottom: '2px' }}>v{version}</span>
             </div>
           </IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={() => setActiveScreen('test')} color={activeScreen === 'test' ? 'primary' : 'medium'}>
+          <div slot="end" className="view-icons">
+            <IonButton fill="clear" onClick={() => setActiveScreen('test')} color={activeScreen === 'test' ? 'primary' : 'medium'}>
               <IonIcon slot="icon-only" icon={flask} />
             </IonButton>
-            <IonButton onClick={() => setActiveScreen('simulation')} color={activeScreen === 'simulation' ? 'primary' : 'medium'}>
+            <IonButton fill="clear" onClick={() => setActiveScreen('simulation')} color={activeScreen === 'simulation' ? 'primary' : 'medium'}>
               <IonIcon slot="icon-only" icon={car} />
             </IonButton>
-            <IonButton onClick={() => setActiveScreen('map')} color={activeScreen === 'map' ? 'primary' : 'medium'}>
+            <IonButton fill="clear" onClick={() => setActiveScreen('map')} color={activeScreen === 'map' ? 'primary' : 'medium'}>
               <IonIcon slot="icon-only" icon={map} />
             </IonButton>
-          </IonButtons>
+          </div>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen style={{ '--padding-start': '8px', '--padding-end': '8px', '--padding-top': '6px', '--padding-bottom': '8px' }}>
