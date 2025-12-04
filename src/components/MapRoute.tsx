@@ -13,7 +13,7 @@ import {
   IonIcon,
   IonList,
 } from '@ionic/react';
-import { navigate, play, stop } from 'ionicons/icons';
+import { navigate } from 'ionicons/icons';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -64,10 +64,13 @@ const currentIcon = new L.Icon({
 });
 
 interface MapRouteProps {
-  onStartSimulation: (startLat: number, startLon: number, endLat: number, endLon: number, speed: number) => void;
-  onStopSimulation: () => void;
+  onStart: (routeGeometry: [number, number][], totalDistance: number, speed: number) => void;
+  onStop: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  onComplete: (callback: () => void) => void;
   currentLocation: { latitude: number; longitude: number } | null;
-  isSimulating: boolean;
+  distanceTraveled: number; // meters traveled so far
 }
 
 interface Suggestion {
@@ -93,7 +96,7 @@ const MapBoundsUpdater: React.FC<{ bounds: L.LatLngBoundsExpression | null }> = 
   const map = useMap();
   useEffect(() => {
     if (bounds) {
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [20, 20] });
     }
   }, [bounds, map]);
   return null;
@@ -128,11 +131,22 @@ const MapSizeInvalidator: React.FC = () => {
 };
 
 const MapRoute: React.FC<MapRouteProps> = ({
-  onStartSimulation,
-  onStopSimulation,
+  onStart,
+  onStop,
+  onPause,
+  onResume,
+  onComplete,
   currentLocation,
-  isSimulating,
+  distanceTraveled,
 }) => {
+  const [simState, setSimState] = useState<'idle' | 'running' | 'paused'>('idle');
+
+  useEffect(() => {
+    // Register completion callback with parent
+    onComplete(() => {
+      setSimState('idle');
+    });
+  }, [onComplete]);
   // Coordinates state
   const [biasCoords, setBiasCoords] = useState<{ lat: number; lon: number }>({ lat: 45.5017, lon: -73.5673 });
   const [startCoords, setStartCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -355,20 +369,50 @@ const MapRoute: React.FC<MapRouteProps> = ({
     }
   }, [startCoords, endCoords]);
 
-  const handleStartSimulation = () => {
-    if (startCoords && endCoords) {
-      onStartSimulation(startCoords.lat, startCoords.lon, endCoords.lat, endCoords.lon, speed);
+  const handleStart = () => {
+    if (startCoords && endCoords && routeInfo) {
+      setSimState('running');
+      onStart(routeInfo.geometry, routeInfo.distance, speed);
     }
   };
 
+  const handleStop = () => {
+    setSimState('idle');
+    onStop();
+  };
+
+  const handlePause = () => {
+    setSimState('paused');
+    onPause();
+  };
+
+  const handleResume = () => {
+    setSimState('running');
+    onResume();
+  };
+
   const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
+    const totalSeconds = Math.round(seconds);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
     if (mins >= 60) {
       const hours = Math.floor(mins / 60);
       const remainingMins = mins % 60;
-      return `${hours}h ${remainingMins}m`;
+      return `${hours}h ${remainingMins} min ${secs} sec`;
     }
-    return `${mins}m`;
+    if (mins > 0) {
+      return `${mins} min ${secs} sec`;
+    }
+    return `${secs} sec`;
+  };
+
+  // Calculate remaining time based on distance and speed (no API calls)
+  const calculateRemainingTime = (remainingMeters: number, speedKmh: number): string => {
+    if (speedKmh <= 0) return '0 sec';
+    const remainingKm = remainingMeters / 1000;
+    const hoursRemaining = remainingKm / speedKmh;
+    const secondsRemaining = hoursRemaining * 3600;
+    return formatDuration(secondsRemaining);
   };
 
   const formatDistance = (meters: number): string => {
@@ -399,7 +443,7 @@ const MapRoute: React.FC<MapRouteProps> = ({
                 }}
                 onIonFocus={() => biasSuggestions.length > 0 && setShowBiasSuggestions(true)}
                 onIonBlur={() => setTimeout(() => setShowBiasSuggestions(false), 200)}
-                disabled={isSimulating}
+                disabled={simState !== 'idle'}
               />
             </IonItem>
             {showBiasSuggestions && biasSuggestions.length > 0 && (
@@ -437,7 +481,7 @@ const MapRoute: React.FC<MapRouteProps> = ({
                 }}
                 onIonFocus={() => startSuggestions.length > 0 && setShowStartSuggestions(true)}
                 onIonBlur={() => setTimeout(() => setShowStartSuggestions(false), 200)}
-                disabled={isSimulating}
+                disabled={simState !== 'idle'}
               />
             </IonItem>
             {showStartSuggestions && startSuggestions.length > 0 && (
@@ -481,7 +525,7 @@ const MapRoute: React.FC<MapRouteProps> = ({
                 }}
                 onIonFocus={() => endSuggestions.length > 0 && setShowEndSuggestions(true)}
                 onIonBlur={() => setTimeout(() => setShowEndSuggestions(false), 200)}
-                disabled={isSimulating}
+                disabled={simState !== 'idle'}
               />
             </IonItem>
             {showEndSuggestions && endSuggestions.length > 0 && (
@@ -514,7 +558,7 @@ const MapRoute: React.FC<MapRouteProps> = ({
               type="number"
               value={speed}
               onIonInput={(e) => setSpeed(parseInt(e.detail.value || '40', 10))}
-              disabled={isSimulating}
+              disabled={simState !== 'idle'}
             />
           </IonItem>
 
@@ -534,8 +578,11 @@ const MapRoute: React.FC<MapRouteProps> = ({
               <div className="route-info">
                 <IonText color="primary">
                   <p>
-                    <IonIcon icon={navigate} /> {formatDistance(routeInfo.distance)} •{' '}
-                    {formatDuration(routeInfo.duration)}
+                    <IonIcon icon={navigate} />{' '}
+                    {formatDistance(routeInfo.distance)} • {calculateRemainingTime(routeInfo.distance, speed)}
+                    {simState !== 'idle' && (
+                      <> • ETA {calculateRemainingTime(Math.max(0, routeInfo.distance - distanceTraveled), speed)}</>
+                    )}
                   </p>
                 </IonText>
               </div>
@@ -548,29 +595,39 @@ const MapRoute: React.FC<MapRouteProps> = ({
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-            {!isSimulating ? (
+          {simState === 'idle' && (
+            <div className="button-container">
               <IonButton
                 expand="block"
-                onClick={handleStartSimulation}
-                disabled={!startCoords || !endCoords || loading}
-                style={{ flex: 1 }}
+                color="success"
+                onClick={handleStart}
+                disabled={!startCoords || !endCoords || !routeInfo || loading}
+                style={{ flex: 1, margin: 0 }}
               >
-                <IonIcon icon={play} slot="start" />
-                Start Simulation
+                Start
               </IonButton>
-            ) : (
-              <IonButton
-                expand="block"
-                color="danger"
-                onClick={onStopSimulation}
-                style={{ flex: 1 }}
-              >
-                <IonIcon icon={stop} slot="start" />
+            </div>
+          )}
+          {simState === 'paused' && (
+            <div className="button-container">
+              <IonButton expand="block" color="primary" onClick={handleResume} style={{ flex: 1, margin: 0 }}>
+                Resume
+              </IonButton>
+              <IonButton expand="block" color="danger" onClick={handleStop} style={{ flex: 1, margin: 0 }}>
                 Stop
               </IonButton>
-            )}
-          </div>
+            </div>
+          )}
+          {simState === 'running' && (
+            <div className="button-container">
+              <IonButton expand="block" color="warning" onClick={handlePause} style={{ flex: 1, margin: 0 }}>
+                Pause
+              </IonButton>
+              <IonButton expand="block" color="danger" onClick={handleStop} style={{ flex: 1, margin: 0 }}>
+                Stop
+              </IonButton>
+            </div>
+          )}
         </IonCardContent>
       </IonCard>
 
@@ -595,7 +652,7 @@ const MapRoute: React.FC<MapRouteProps> = ({
               {endCoords && (
                 <Marker position={[endCoords.lat, endCoords.lon]} icon={endIcon} />
               )}
-              {currentLocation && isSimulating && (
+              {currentLocation && simState !== 'idle' && (
                 <Marker
                   position={[currentLocation.latitude, currentLocation.longitude]}
                   icon={currentIcon}

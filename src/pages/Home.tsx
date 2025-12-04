@@ -13,6 +13,7 @@ const Home: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeScreen, setActiveScreen] = useState<'test' | 'simulation' | 'map'>('test');
   const [progress, setProgress] = useState<number>(0);
+  const [distanceTraveled, setDistanceTraveled] = useState<number>(0);
   const simulationInterval = useRef<NodeJS.Timeout | null>(null);
   const simulationState = useRef<{
     startLat: number;
@@ -22,6 +23,14 @@ const Home: React.FC = () => {
     speed: number;
     totalDistance: number;
     currentDistance: number;
+  } | null>(null);
+  // Route-based simulation state for map view
+  const routeSimulationState = useRef<{
+    geometry: [number, number][]; // [lat, lon] pairs
+    segmentDistances: number[];   // distance of each segment in meters
+    totalDistance: number;        // total distance in meters
+    speed: number;                // km/h
+    currentDistance: number;      // meters traveled
   } | null>(null);
   const onSimulationCompleteRef = useRef<(() => void) | null>(null);
 
@@ -44,6 +53,49 @@ const Home: React.FC = () => {
     const θ = Math.atan2(y, x);
 
     return (toDeg(θ) + 360) % 360; // Normalize to 0-360
+  };
+
+  // Calculate distance between two points in meters using Haversine formula
+  const calculateDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const toRad = (deg: number) => deg * Math.PI / 180;
+    const R = 6371000; // Earth's radius in meters
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Get position along route geometry at a given distance
+  const getPositionAlongRoute = (
+    geometry: [number, number][],
+    segmentDistances: number[],
+    distanceTraveled: number
+  ): { lat: number; lon: number; bearing: number } => {
+    let accumulated = 0;
+    for (let i = 0; i < segmentDistances.length; i++) {
+      const segmentDist = segmentDistances[i];
+      if (accumulated + segmentDist >= distanceTraveled) {
+        // We're on this segment
+        const segmentProgress = (distanceTraveled - accumulated) / segmentDist;
+        const [lat1, lon1] = geometry[i];
+        const [lat2, lon2] = geometry[i + 1];
+        const lat = lat1 + (lat2 - lat1) * segmentProgress;
+        const lon = lon1 + (lon2 - lon1) * segmentProgress;
+        const bearing = calculateBearing(lat1, lon1, lat2, lon2);
+        return { lat, lon, bearing };
+      }
+      accumulated += segmentDist;
+    }
+    // Past the end, return last point
+    const lastIdx = geometry.length - 1;
+    const [lat, lon] = geometry[lastIdx];
+    const bearing = lastIdx > 0
+      ? calculateBearing(geometry[lastIdx - 1][0], geometry[lastIdx - 1][1], lat, lon)
+      : 0;
+    return { lat, lon, bearing };
   };
 
   const handleEnableMockLocation = async () => {
@@ -311,6 +363,171 @@ const Home: React.FC = () => {
     onSimulationCompleteRef.current = callback;
   };
 
+  // Route-based simulation interval (for map view)
+  const startRouteSimulationInterval = () => {
+    if (!routeSimulationState.current) return;
+
+    const { geometry, segmentDistances, totalDistance, speed } = routeSimulationState.current;
+
+    // Update interval in milliseconds (update every 250ms)
+    const updateInterval = 250;
+    // Distance traveled per update in meters (speed is km/h)
+    const distancePerUpdate = (speed * 1000 / 3600) * (updateInterval / 1000);
+
+    // Clear any existing interval
+    if (simulationInterval.current) {
+      clearInterval(simulationInterval.current);
+    }
+
+    simulationInterval.current = setInterval(async () => {
+      if (!routeSimulationState.current) return;
+
+      routeSimulationState.current.currentDistance += distancePerUpdate;
+      const progressValue = Math.min(routeSimulationState.current.currentDistance / totalDistance, 1);
+      setProgress(progressValue);
+      setDistanceTraveled(routeSimulationState.current.currentDistance);
+
+      if (routeSimulationState.current.currentDistance >= totalDistance) {
+        // Reached destination
+        const { lat, lon, bearing } = getPositionAlongRoute(geometry, segmentDistances, totalDistance);
+
+        await LocationMocker.setMockLocation({
+          latitude: lat,
+          longitude: lon,
+          accuracy: 1.0,
+          bearing: bearing,
+        });
+        setCurrentLocation({ latitude: lat, longitude: lon, accuracy: 1.0 });
+        setDistanceTraveled(totalDistance);
+        setStatus('Arrived at destination');
+        setProgress(1);
+
+        // Clear interval
+        if (simulationInterval.current) {
+          clearInterval(simulationInterval.current);
+          simulationInterval.current = null;
+        }
+        routeSimulationState.current = null;
+
+        // Notify completion
+        setTimeout(() => {
+          if (onSimulationCompleteRef.current) {
+            onSimulationCompleteRef.current();
+          }
+        }, 200);
+      } else {
+        // Get current position along route
+        const { lat, lon, bearing } = getPositionAlongRoute(
+          geometry,
+          segmentDistances,
+          routeSimulationState.current.currentDistance
+        );
+
+        await LocationMocker.setMockLocation({
+          latitude: lat,
+          longitude: lon,
+          accuracy: 1.0,
+          bearing: bearing,
+        });
+        setCurrentLocation({ latitude: lat, longitude: lon, accuracy: 1.0 });
+      }
+    }, updateInterval);
+  };
+
+  // Handler for map route simulation start
+  const handleMapRouteStart = async (routeGeometry: [number, number][], totalDistanceMeters: number, speed: number) => {
+    try {
+      setStatus('Starting route simulation...');
+      setError(null);
+      setProgress(0);
+      setDistanceTraveled(0);
+
+      // Enable mock location first
+      await LocationMocker.enableMockLocation();
+
+      // Calculate segment distances
+      const segmentDistances: number[] = [];
+      for (let i = 0; i < routeGeometry.length - 1; i++) {
+        const [lat1, lon1] = routeGeometry[i];
+        const [lat2, lon2] = routeGeometry[i + 1];
+        segmentDistances.push(calculateDistanceMeters(lat1, lon1, lat2, lon2));
+      }
+
+      // Set starting position
+      const [startLat, startLon] = routeGeometry[0];
+      await LocationMocker.setMockLocation({
+        latitude: startLat,
+        longitude: startLon,
+        accuracy: 1.0,
+      });
+      setCurrentLocation({ latitude: startLat, longitude: startLon, accuracy: 1.0 });
+
+      // Store route simulation state
+      routeSimulationState.current = {
+        geometry: routeGeometry,
+        segmentDistances,
+        totalDistance: totalDistanceMeters,
+        speed,
+        currentDistance: 0
+      };
+
+      setStatus(`Driving ${(totalDistanceMeters / 1000).toFixed(2)} km at ${speed} km/h`);
+
+      // Start the simulation interval
+      startRouteSimulationInterval();
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start simulation');
+      setStatus('Error');
+      setProgress(0);
+      if (simulationInterval.current) {
+        clearInterval(simulationInterval.current);
+        simulationInterval.current = null;
+      }
+      routeSimulationState.current = null;
+    }
+  };
+
+  // Updated stop to handle both simulation types
+  const handleMapRouteStop = async () => {
+    try {
+      setStatus('Stopping simulation...');
+      setError(null);
+
+      if (simulationInterval.current) {
+        clearInterval(simulationInterval.current);
+        simulationInterval.current = null;
+      }
+
+      routeSimulationState.current = null;
+
+      await LocationMocker.disableMockLocation();
+      setStatus('Simulation stopped');
+      setProgress(0);
+      setDistanceTraveled(0);
+      setCurrentLocation(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to stop simulation');
+      setStatus('Error');
+      setProgress(0);
+    }
+  };
+
+  const handleMapRoutePause = () => {
+    if (simulationInterval.current) {
+      clearInterval(simulationInterval.current);
+      simulationInterval.current = null;
+    }
+    setStatus('Simulation paused');
+  };
+
+  const handleMapRouteResume = () => {
+    if (!routeSimulationState.current) return;
+
+    setStatus(`Driving ${(routeSimulationState.current.totalDistance / 1000).toFixed(2)} km at ${routeSimulationState.current.speed} km/h`);
+    startRouteSimulationInterval();
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -471,10 +688,13 @@ const Home: React.FC = () => {
 
         {activeScreen === 'map' && (
           <MapRoute
-            onStartSimulation={handleSimulationStart}
-            onStopSimulation={handleSimulationStop}
+            onStart={handleMapRouteStart}
+            onStop={handleMapRouteStop}
+            onPause={handleMapRoutePause}
+            onResume={handleMapRouteResume}
+            onComplete={handleSimulationComplete}
             currentLocation={currentLocation}
-            isSimulating={!!simulationInterval.current}
+            distanceTraveled={distanceTraveled}
           />
         )}
       </IonContent>
