@@ -3,7 +3,7 @@
 }
 
 .map-container {
-  height: calc(100vh - 510px);
+  height: calc(100vh - 515px);
   min-height: 200px;
   max-height: 500px;
   width: 100%;
