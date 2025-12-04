@@ -12,8 +12,18 @@ import {
   IonSpinner,
   IonIcon,
   IonList,
+  IonModal,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonButtons,
+  IonItemSliding,
+  IonItemOptions,
+  IonItemOption,
 } from '@ionic/react';
-import { navigate } from 'ionicons/icons';
+import { navigate, folderOpen, trash, save, closeCircle } from 'ionicons/icons';
+import { Preferences } from '@capacitor/preferences';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -89,6 +99,18 @@ interface RouteInfo {
   distance: number;
   duration: number;
   geometry: [number, number][];
+}
+
+interface SavedRoute {
+  id: string;
+  name: string;
+  biasInput: string;
+  biasCoords: { lat: number; lon: number };
+  startInput: string;
+  startCoords: { lat: number; lon: number };
+  endInput: string;
+  endCoords: { lat: number; lon: number };
+  distance: number;
 }
 
 // Component to update map view when bounds change
@@ -172,6 +194,11 @@ const MapRoute: React.FC<MapRouteProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [mapBounds, setMapBounds] = useState<L.LatLngBoundsExpression | null>(null);
 
+  // Saved routes state
+  const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
+  const [showRoutesModal, setShowRoutesModal] = useState(false);
+  const [routeName, setRouteName] = useState('');
+
   // Refs
   const searchBoxRef = useRef<SearchBoxCore | null>(null);
   const sessionTokenRef = useRef<SessionToken | null>(null);
@@ -185,6 +212,61 @@ const MapRoute: React.FC<MapRouteProps> = ({
     searchBoxRef.current = new SearchBoxCore({ accessToken: MAPBOX_TOKEN });
     sessionTokenRef.current = new SessionToken();
   }, []);
+
+  // Load saved routes on mount
+  useEffect(() => {
+    const loadRoutes = async () => {
+      const { value } = await Preferences.get({ key: 'savedRoutes' });
+      if (value) {
+        setSavedRoutes(JSON.parse(value));
+      }
+    };
+    loadRoutes();
+  }, []);
+
+  // Save route to storage
+  const handleSaveRoute = async () => {
+    if (!startCoords || !endCoords || !routeInfo) {
+      return;
+    }
+
+    const name = routeName.trim() || `${startInput.split(',')[0]} → ${endInput.split(',')[0]}`;
+    const newRoute: SavedRoute = {
+      id: Date.now().toString(),
+      name,
+      biasInput,
+      biasCoords,
+      startInput,
+      startCoords,
+      endInput,
+      endCoords,
+      distance: routeInfo.distance,
+    };
+
+    const updatedRoutes = [...savedRoutes, newRoute];
+    setSavedRoutes(updatedRoutes);
+    await Preferences.set({ key: 'savedRoutes', value: JSON.stringify(updatedRoutes) });
+    setRouteName('');
+    setShowRoutesModal(false);
+  };
+
+  // Load a saved route
+  const handleLoadRoute = (route: SavedRoute) => {
+    setBiasInput(route.biasInput);
+    setBiasCoords(route.biasCoords);
+    setStartInput(route.startInput);
+    setStartCoords(route.startCoords);
+    setEndInput(route.endInput);
+    setEndCoords(route.endCoords);
+    setShowRoutesModal(false);
+  };
+
+  // Delete a saved route
+  const handleDeleteRoute = async (id: string) => {
+    const updatedRoutes = savedRoutes.filter(r => r.id !== id);
+    setSavedRoutes(updatedRoutes);
+    await Preferences.set({ key: 'savedRoutes', value: JSON.stringify(updatedRoutes) });
+  };
 
   // Fetch suggestions
   const fetchSuggestions = useCallback(async (
@@ -426,7 +508,18 @@ const MapRoute: React.FC<MapRouteProps> = ({
     <>
       <IonCard>
         <IonCardHeader>
-          <IonCardTitle>Route Planning</IonCardTitle>
+          <IonCardTitle style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Route</span>
+            <IonButton
+              fill="clear"
+              size="small"
+              onClick={() => setShowRoutesModal(true)}
+              disabled={simState !== 'idle'}
+              style={{ margin: 0 }}
+            >
+              <IonIcon slot="icon-only" icon={folderOpen} />
+            </IonButton>
+          </IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
           {/* Location Bias Field */}
@@ -483,6 +576,20 @@ const MapRoute: React.FC<MapRouteProps> = ({
                 onIonBlur={() => setTimeout(() => setShowStartSuggestions(false), 200)}
                 disabled={simState !== 'idle'}
               />
+              {startInput && simState === 'idle' && (
+                <IonButton
+                  fill="clear"
+                  slot="end"
+                  onClick={() => {
+                    setStartInput('');
+                    setStartCoords(null);
+                    setStartSuggestions([]);
+                    setRouteInfo(null);
+                  }}
+                >
+                  <IonIcon slot="icon-only" icon={closeCircle} color="medium" />
+                </IonButton>
+              )}
             </IonItem>
             {showStartSuggestions && startSuggestions.length > 0 && (
               <IonList className="suggestions-list">
@@ -527,6 +634,20 @@ const MapRoute: React.FC<MapRouteProps> = ({
                 onIonBlur={() => setTimeout(() => setShowEndSuggestions(false), 200)}
                 disabled={simState !== 'idle'}
               />
+              {endInput && simState === 'idle' && (
+                <IonButton
+                  fill="clear"
+                  slot="end"
+                  onClick={() => {
+                    setEndInput('');
+                    setEndCoords(null);
+                    setEndSuggestions([]);
+                    setRouteInfo(null);
+                  }}
+                >
+                  <IonIcon slot="icon-only" icon={closeCircle} color="medium" />
+                </IonButton>
+              )}
             </IonItem>
             {showEndSuggestions && endSuggestions.length > 0 && (
               <IonList className="suggestions-list">
@@ -667,6 +788,78 @@ const MapRoute: React.FC<MapRouteProps> = ({
           </div>
         </IonCardContent>
       </IonCard>
+
+      {/* Saved Routes Modal */}
+      <IonModal isOpen={showRoutesModal} onDidDismiss={() => setShowRoutesModal(false)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Saved Routes</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowRoutesModal(false)}>Close</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent>
+          {/* Save current route section */}
+          {startCoords && endCoords && routeInfo && (
+            <IonCard>
+              <IonCardHeader>
+                <IonCardTitle>Save Current Route</IonCardTitle>
+              </IonCardHeader>
+              <IonCardContent>
+                <IonItem>
+                  <IonLabel position="stacked">Route Name (optional)</IonLabel>
+                  <IonInput
+                    value={routeName}
+                    placeholder={`${startInput.split(',')[0]} → ${endInput.split(',')[0]}`}
+                    onIonInput={(e) => setRouteName(e.detail.value || '')}
+                  />
+                </IonItem>
+                <IonButton
+                  expand="block"
+                  onClick={handleSaveRoute}
+                  style={{ marginTop: '12px' }}
+                >
+                  <IonIcon slot="start" icon={save} />
+                  Save Route
+                </IonButton>
+              </IonCardContent>
+            </IonCard>
+          )}
+
+          {/* Saved routes list */}
+          <IonCard>
+            <IonCardHeader>
+              <IonCardTitle>Load Route</IonCardTitle>
+            </IonCardHeader>
+            <IonCardContent style={{ padding: 0 }}>
+              {savedRoutes.length === 0 ? (
+                <IonItem>
+                  <IonLabel color="medium">No saved routes</IonLabel>
+                </IonItem>
+              ) : (
+                <IonList>
+                  {savedRoutes.map((route) => (
+                    <IonItemSliding key={route.id}>
+                      <IonItem button onClick={() => handleLoadRoute(route)}>
+                        <IonLabel>
+                          <h2>{route.name}</h2>
+                          <p>{formatDistance(route.distance)}</p>
+                        </IonLabel>
+                      </IonItem>
+                      <IonItemOptions side="end">
+                        <IonItemOption color="danger" onClick={() => handleDeleteRoute(route.id)}>
+                          <IonIcon slot="icon-only" icon={trash} />
+                        </IonItemOption>
+                      </IonItemOptions>
+                    </IonItemSliding>
+                  ))}
+                </IonList>
+              )}
+            </IonCardContent>
+          </IonCard>
+        </IonContent>
+      </IonModal>
     </>
   );
 };
