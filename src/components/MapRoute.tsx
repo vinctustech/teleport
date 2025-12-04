@@ -96,7 +96,7 @@ const MapBoundsUpdater: React.FC<{ bounds: L.LatLngBoundsExpression | null }> = 
   const map = useMap();
   useEffect(() => {
     if (bounds) {
-      map.fitBounds(bounds, { padding: [20, 20] });
+      map.fitBounds(bounds, { padding: [15, 15], maxZoom: 19 });
     }
   }, [bounds, map]);
   return null;
@@ -637,6 +637,8 @@ const MapRoute: React.FC<MapRouteProps> = ({
             <MapContainer
               center={defaultCenter}
               zoom={13}
+              zoomSnap={0.25}
+              zoomDelta={0.25}
               style={{ height: '100%', width: '100%' }}
             >
               <TileLayer
