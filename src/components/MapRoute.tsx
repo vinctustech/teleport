@@ -21,8 +21,10 @@ import {
   IonItemSliding,
   IonItemOptions,
   IonItemOption,
+  IonRow,
+  IonCol,
 } from '@ionic/react';
-import { navigate, folderOpen, trash, save, closeCircle } from 'ionicons/icons';
+import { navigate, folderOpen, trash, save, closeCircle, swapVertical } from 'ionicons/icons';
 import { Preferences } from '@capacitor/preferences';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -102,15 +104,10 @@ interface RouteInfo {
 }
 
 interface SavedRoute {
-  id: string;
   name: string;
   biasInput: string;
-  biasCoords: { lat: number; lon: number };
   startInput: string;
-  startCoords: { lat: number; lon: number };
   endInput: string;
-  endCoords: { lat: number; lon: number };
-  distance: number;
 }
 
 // Component to update map view when bounds change
@@ -213,12 +210,65 @@ const MapRoute: React.FC<MapRouteProps> = ({
     sessionTokenRef.current = new SessionToken();
   }, []);
 
+  // Geocode an address using Mapbox
+  const geocodeAddress = async (address: string): Promise<{ lat: number; lon: number } | null> => {
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${MAPBOX_TOKEN}&limit=1`
+      );
+      const data = await response.json();
+      if (data.features && data.features.length > 0) {
+        const [lon, lat] = data.features[0].center;
+        return { lat, lon };
+      }
+      return null;
+    } catch (err) {
+      console.error('Geocoding error:', err);
+      return null;
+    }
+  };
+
+  // Load a route by geocoding its addresses
+  const loadRoute = async (route: SavedRoute) => {
+    setBiasInput(route.biasInput);
+    setStartInput(route.startInput);
+    setEndInput(route.endInput);
+
+    // Geocode the addresses
+    const [startResult, endResult, biasResult] = await Promise.all([
+      geocodeAddress(route.startInput),
+      geocodeAddress(route.endInput),
+      geocodeAddress(route.biasInput),
+    ]);
+
+    if (biasResult) setBiasCoords(biasResult);
+    if (startResult) setStartCoords(startResult);
+    if (endResult) setEndCoords(endResult);
+  };
+
   // Load saved routes on mount
   useEffect(() => {
     const loadRoutes = async () => {
       const { value } = await Preferences.get({ key: 'savedRoutes' });
       if (value) {
-        setSavedRoutes(JSON.parse(value));
+        const routes: SavedRoute[] = JSON.parse(value);
+        setSavedRoutes(routes);
+        // Load the first route automatically
+        if (routes.length > 0) {
+          loadRoute(routes[0]);
+        }
+      } else {
+        // First run - create default route
+        const defaultRoute: SavedRoute = {
+          name: 'Route1',
+          biasInput: 'Westmount, Quebec, Canada',
+          startInput: '4824 Sherbrooke Street West, Westmount, Quebec H3Z 1G8, Canada',
+          endInput: '4698 Westmount Avenue, Westmount, Quebec H3Y 1X4, Canada',
+        };
+        const defaultRoutes = [defaultRoute];
+        setSavedRoutes(defaultRoutes);
+        await Preferences.set({ key: 'savedRoutes', value: JSON.stringify(defaultRoutes) });
+        loadRoute(defaultRoute);
       }
     };
     loadRoutes();
@@ -226,44 +276,44 @@ const MapRoute: React.FC<MapRouteProps> = ({
 
   // Save route to storage
   const handleSaveRoute = async () => {
-    if (!startCoords || !endCoords || !routeInfo) {
+    if (!startInput || !endInput) {
       return;
     }
 
     const name = routeName.trim() || `${startInput.split(',')[0]} → ${endInput.split(',')[0]}`;
+
+    // Check if route with this name already exists
+    const existingRoute = savedRoutes.find(r => r.name === name);
+    if (existingRoute) {
+      const confirmed = window.confirm(`A route named "${name}" already exists. Do you want to overwrite it?`);
+      if (!confirmed) {
+        return;
+      }
+    }
+
     const newRoute: SavedRoute = {
-      id: Date.now().toString(),
       name,
       biasInput,
-      biasCoords,
       startInput,
-      startCoords,
       endInput,
-      endCoords,
-      distance: routeInfo.distance,
     };
 
-    const updatedRoutes = [...savedRoutes, newRoute];
+    const updatedRoutes = [...savedRoutes.filter(r => r.name !== name), newRoute];
     setSavedRoutes(updatedRoutes);
     await Preferences.set({ key: 'savedRoutes', value: JSON.stringify(updatedRoutes) });
     setRouteName('');
     setShowRoutesModal(false);
   };
 
-  // Load a saved route
+  // Load a saved route (with geocoding)
   const handleLoadRoute = (route: SavedRoute) => {
-    setBiasInput(route.biasInput);
-    setBiasCoords(route.biasCoords);
-    setStartInput(route.startInput);
-    setStartCoords(route.startCoords);
-    setEndInput(route.endInput);
-    setEndCoords(route.endCoords);
     setShowRoutesModal(false);
+    loadRoute(route);
   };
 
   // Delete a saved route
-  const handleDeleteRoute = async (id: string) => {
-    const updatedRoutes = savedRoutes.filter(r => r.id !== id);
+  const handleDeleteRoute = async (name: string) => {
+    const updatedRoutes = savedRoutes.filter(r => r.name !== name);
     setSavedRoutes(updatedRoutes);
     await Preferences.set({ key: 'savedRoutes', value: JSON.stringify(updatedRoutes) });
   };
@@ -473,6 +523,16 @@ const MapRoute: React.FC<MapRouteProps> = ({
     onResume();
   };
 
+  const handleFlipStartEnd = () => {
+    // Swap start and end
+    const tempInput = startInput;
+    const tempCoords = startCoords;
+    setStartInput(endInput);
+    setStartCoords(endCoords);
+    setEndInput(tempInput);
+    setEndCoords(tempCoords);
+  };
+
   const formatDuration = (seconds: number): string => {
     const totalSeconds = Math.round(seconds);
     const mins = Math.floor(totalSeconds / 60);
@@ -673,15 +733,30 @@ const MapRoute: React.FC<MapRouteProps> = ({
             )}
           </div>
 
-          <IonItem>
-            <IonLabel position="stacked">Speed (km/h)</IonLabel>
-            <IonInput
-              type="number"
-              value={speed}
-              onIonInput={(e) => setSpeed(parseInt(e.detail.value || '40', 10))}
-              disabled={simState !== 'idle'}
-            />
-          </IonItem>
+          <IonRow style={{ alignItems: 'flex-end' }}>
+            <IonCol size="9">
+              <IonItem>
+                <IonLabel position="stacked">Speed (km/h)</IonLabel>
+                <IonInput
+                  type="number"
+                  value={speed}
+                  onIonInput={(e) => setSpeed(parseInt(e.detail.value || '40', 10))}
+                  disabled={simState !== 'idle'}
+                />
+              </IonItem>
+            </IonCol>
+            <IonCol size="3">
+              <IonButton
+                expand="block"
+                fill="outline"
+                onClick={handleFlipStartEnd}
+                disabled={simState !== 'idle'}
+                style={{ margin: 0 }}
+              >
+                <IonIcon icon={swapVertical} />
+              </IonButton>
+            </IonCol>
+          </IonRow>
 
           {error && (
             <IonText color="danger">
@@ -840,15 +915,14 @@ const MapRoute: React.FC<MapRouteProps> = ({
               ) : (
                 <IonList>
                   {savedRoutes.map((route) => (
-                    <IonItemSliding key={route.id}>
+                    <IonItemSliding key={route.name}>
                       <IonItem button onClick={() => handleLoadRoute(route)}>
                         <IonLabel>
                           <h2>{route.name}</h2>
-                          <p>{formatDistance(route.distance)}</p>
                         </IonLabel>
                       </IonItem>
                       <IonItemOptions side="end">
-                        <IonItemOption color="danger" onClick={() => handleDeleteRoute(route.id)}>
+                        <IonItemOption color="danger" onClick={() => handleDeleteRoute(route.name)}>
                           <IonIcon slot="icon-only" icon={trash} />
                         </IonItemOption>
                       </IonItemOptions>

@@ -56,9 +56,11 @@ ion-item {
   display: flex;
   align-items: center;
   gap: 0;
+  margin-right: -4px;
 }
 
 .view-icons ion-button {
-  --padding-start: 4px;
-  --padding-end: 4px;
+  --padding-start: 2px;
+  --padding-end: 2px;
+  min-width: 36px;
 }
