@@ -35,7 +35,7 @@
 <div align="center">
   <img src="public/screenshots/test-screen.png" alt="Test Screen" width="250" />
   <img src="public/screenshots/simulation-screen.png" alt="Simulation Screen" width="250" />
-  <img src="public/screenshots/route-screen.png" alt="Route Screen" width="250" />
+  <img src="public/screenshots/route-screen.png?v=2" alt="Route Screen" width="250" />
   <br/>
   <em>Test Screen, Simulation Screen, and Route Screen</em>
 </div>
