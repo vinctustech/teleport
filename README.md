@@ -12,7 +12,7 @@
 ## Features
 
 - **Mock Location Testing** - Set your device to a specific GPS location (e.g., Westmount Public Library, Montreal)
-- **Driver Simulation** - Simulate realistic movement between two locations
+- **Driver Simulation** - Simulate realistic movement between two coordinates
   - Configure start and end coordinates
   - Set travel speed (km/h)
   - Save and load simulations for quick access
@@ -20,22 +20,29 @@
   - Pause/resume simulation in progress
   - Real-time progress tracking with current coordinates
   - Auto-resets to idle state when destination reached
+- **Route Navigation** - Map-based routing with real road navigation
+  - Address search with autocomplete (powered by Mapbox)
+  - Real road routing via OSRM
+  - Visual route preview on map
+  - Save and load routes
+  - Swap start/end addresses
+  - Configurable travel speed
 - **Responsive UI** - Compact layout optimized for small phone screens
 - **Dark Mode** - Automatically adapts to your device's light/dark mode preference
 
 ## Screenshots
 
-The app provides two main screens:
-
 <div align="center">
-  <img src="public/screenshots/test-screen.png" alt="Test Screen" width="300" />
-  <img src="public/screenshots/simulation-screen.png" alt="Simulation Screen" width="300" />
+  <img src="public/screenshots/test-screen.png" alt="Test Screen" width="250" />
+  <img src="public/screenshots/simulation-screen.png" alt="Simulation Screen" width="250" />
+  <img src="public/screenshots/route-screen.png" alt="Route Screen" width="250" />
   <br/>
-  <em>Test Screen (left) and Simulation Screen (right)</em>
+  <em>Test Screen, Simulation Screen, and Route Screen</em>
 </div>
 
 1. **Test Screen** - Quick location mocking with preset coordinates
-2. **Simulation Screen** - Full driver simulation with customizable parameters
+2. **Simulation Screen** - Driver simulation with customizable start/end coordinates
+3. **Route Screen** - Map-based routing with address search and real road navigation
 
 ## Requirements
 
@@ -45,11 +52,9 @@ The app provides two main screens:
 
 ## Installation
 
-### For Users
+### For Users (Manual)
 
-1. Download the latest APK:
-   - [teleport-v1.0-debug.apk](teleport-v1.0-debug.apk) (direct download from repo)
-   - Or check the [releases page](https://github.com/vinctustech/teleport/releases)
+1. Download the latest APK from the [releases page](https://github.com/vinctustech/teleport/releases)
 2. Install on your Android device (you may need to enable "Install from Unknown Sources")
 3. Enable Developer Options on your device (tap "Build Number" 7 times in Settings → About Phone)
 4. Enable mock location app:
@@ -58,6 +63,24 @@ The app provides two main screens:
      ```bash
      adb shell appops set io.github.vinctustech.teleport android:mock_location allow
      ```
+
+### For Users (ADB)
+
+If you have ADB set up, you can install and configure everything with these commands:
+
+```bash
+# Install the APK
+adb install teleport-v1.4-debug.apk
+
+# Enable developer settings
+adb shell settings put global development_settings_enabled 1
+
+# Set teleport as the mock location app
+adb shell appops set io.github.vinctustech.teleport android:mock_location allow
+
+# Launch the app
+adb shell am start -n io.github.vinctustech.teleport/.MainActivity
+```
 
 ### For Developers
 
@@ -108,10 +131,26 @@ The app provides two main screens:
 7. Click "Start" to begin simulation
 8. Use "Pause"/"Resume" buttons to control the simulation
 9. Click "Stop" to end the simulation and disable mock location
-10. Use the flip button (↕️) next to the speed input to swap start/end coordinates
+10. Use the flip button next to the speed input to swap start/end coordinates
 11. Load saved simulations from the dropdown menu
 
 The simulation uses the Haversine formula to calculate distance and interpolates your position along a straight line between the two points, updating your location every second based on the configured speed. When the destination is reached, the location is set 20 meters beyond the endpoint to ensure apps polling for coordinates capture the final location.
+
+### Route Screen
+
+1. Tap the map icon in the toolbar to access the route screen
+2. Enter a city/region in the "Search Bias" field to improve address search results
+3. Type a start address and select from autocomplete suggestions
+4. Type an end address and select from autocomplete suggestions
+5. Set desired speed in km/h
+6. The route will be calculated automatically and shown on the map
+7. Click "Start" to begin following the route
+8. Use "Pause"/"Resume" buttons to control the simulation
+9. Click "Stop" to end the simulation
+10. Use the swap button to reverse start and end addresses
+11. Save routes for quick access later
+
+The route screen uses OSRM for real road routing, so your simulated location will follow actual streets and roads rather than a straight line.
 
 ## Development
 
@@ -154,6 +193,9 @@ teleport/
 - **TypeScript** - Type-safe JavaScript
 - **Capacitor** - Native mobile runtime
   - Capacitor Preferences API - Persistent simulation storage
+- **Leaflet** - Interactive map display
+- **Mapbox Search** - Address autocomplete
+- **OSRM** - Open Source Routing Machine for road navigation
 - **Android LocationManager API** - GPS location mocking
 - **Orbitron Font** - Custom typography for app branding
 
