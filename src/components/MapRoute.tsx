@@ -774,10 +774,9 @@ const MapRoute: React.FC<MapRouteProps> = ({
               <div className="route-info">
                 <IonText color="primary">
                   <p>
-                    <IonIcon icon={navigate} />{' '}
                     {formatDistance(routeInfo.distance)} • {calculateRemainingTime(routeInfo.distance, speed)}
                     {simState !== 'idle' && (
-                      <> • ETA {calculateRemainingTime(Math.max(0, routeInfo.distance - distanceTraveled), speed)}</>
+                      <> • rem {formatDistance(Math.max(0, routeInfo.distance - distanceTraveled))} • ETA {calculateRemainingTime(Math.max(0, routeInfo.distance - distanceTraveled), speed)}</>
                     )}
                   </p>
                 </IonText>
