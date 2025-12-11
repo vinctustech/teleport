@@ -212,12 +212,13 @@ const Home: React.FC = () => {
         const finalLat = toDeg(φ3);
         const finalLon = toDeg(λ3);
 
-        // Reached destination - set final location 10m beyond endpoint
+        // Reached destination - set final location 10m beyond endpoint (speed 0 since arrived)
         await LocationMocker.setMockLocation({
           latitude: finalLat,
           longitude: finalLon,
           accuracy: 1.0,
           bearing: bearing,
+          speed: 0,
         });
         setCurrentLocation({ latitude: finalLat, longitude: finalLon, accuracy: 1.0 });
         setStatus('Arrived at destination');
@@ -237,6 +238,7 @@ const Home: React.FC = () => {
             longitude: finalLon,
             accuracy: 1.0,
             bearing: bearing,
+            speed: 0,
           });
           // Notify DriverSimulation component to return to idle state
           if (onSimulationCompleteRef.current) {
@@ -252,11 +254,15 @@ const Home: React.FC = () => {
         // Calculate bearing from start to end
         const bearing = calculateBearing(startLat, startLon, endLat, endLon);
 
+        // Convert speed from km/h to m/s for Android Location API
+        const speedMetersPerSecond = speed * 1000 / 3600;
+
         await LocationMocker.setMockLocation({
           latitude: currentLat,
           longitude: currentLon,
           accuracy: 1.0,
           bearing: bearing,
+          speed: speedMetersPerSecond,
         });
         setCurrentLocation({ latitude: currentLat, longitude: currentLon, accuracy: 1.0 });
       }
@@ -396,6 +402,7 @@ const Home: React.FC = () => {
           longitude: lon,
           accuracy: 1.0,
           bearing: bearing,
+          speed: 0,
         });
         setCurrentLocation({ latitude: lat, longitude: lon, accuracy: 1.0 });
         setDistanceTraveled(totalDistance);
@@ -423,11 +430,15 @@ const Home: React.FC = () => {
           routeSimulationState.current.currentDistance
         );
 
+        // Convert speed from km/h to m/s for Android Location API
+        const speedMetersPerSecond = speed * 1000 / 3600;
+
         await LocationMocker.setMockLocation({
           latitude: lat,
           longitude: lon,
           accuracy: 1.0,
           bearing: bearing,
+          speed: speedMetersPerSecond,
         });
         setCurrentLocation({ latitude: lat, longitude: lon, accuracy: 1.0 });
       }
